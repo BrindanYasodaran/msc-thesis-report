@@ -1,0 +1,69 @@
+{
+  // ---------------------------------------------------------------------
+  // macOS PATH fix.
+  //
+  // /Library/TeX/texbin reaches the shell via /etc/paths.d/TeX, which is
+  // read by path_helper during shell startup.  VS Code launched from the
+  // Dock never runs a shell, so it inherits launchd's PATH and cannot see
+  // any TeX binary -- hence "spawn latexmk ENOENT".
+  //
+  // Absolute `command' paths are not sufficient on their own: latexmk
+  // spawns pdflatex and biber by bare name, so each tool also needs a PATH
+  // in its environment.
+  // ---------------------------------------------------------------------
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "/Library/TeX/texbin/latexmk",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-pdf",
+        "-outdir=%OUTDIR%",
+        "%DOC%"
+      ],
+      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+    },
+    {
+      "name": "latexmk_rconly",
+      "command": "/Library/TeX/texbin/latexmk",
+      "args": ["%DOC%"],
+      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+    },
+    {
+      "name": "pdflatex",
+      "command": "/Library/TeX/texbin/pdflatex",
+      "args": ["-synctex=1", "-interaction=nonstopmode", "-file-line-error", "%DOC%"],
+      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+    },
+    {
+      "name": "biber",
+      "command": "/Library/TeX/texbin/biber",
+      "args": ["%DOCFILE%"],
+      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+    }
+  ],
+
+  // Only expose recipes whose tools are defined above.
+  "latex-workshop.latex.recipes": [
+    { "name": "latexmk", "tools": ["latexmk"] },
+    { "name": "latexmk (latexmkrc)", "tools": ["latexmk_rconly"] },
+    { "name": "pdflatex -> biber -> pdflatex * 2",
+      "tools": ["pdflatex", "biber", "pdflatex", "pdflatex"] }
+  ],
+
+  // These helpers are invoked by bare name too, and hit the same problem.
+  "latex-workshop.kpsewhich.path": "/Library/TeX/texbin/kpsewhich",
+  "latex-workshop.synctex.path": "/Library/TeX/texbin/synctex",
+  "latex-workshop.texcount.path": "/Library/TeX/texbin/texcount",
+  "latex-workshop.latexindent.path": "/Library/TeX/texbin/latexindent",
+  "latex-workshop.formatting.latexindent.path": "/Library/TeX/texbin/latexindent",
+  "latex-workshop.texdoc.path": "/Library/TeX/texbin/texdoc",
+
+  // Rebuild on save; jump the PDF to the cursor after each build.
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.synctex.afterBuild.enabled": true,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1500
+}
