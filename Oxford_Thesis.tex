@@ -1432,8 +1432,8 @@ The aim of this experiment is to show that, in a simple 2D setting, a Normalisin
 While the authors of VFM only train the Gaussian adapter with frozen flow map using a reverse kl objective, we additionally train with forward kl to rule out the possibility that the mode seeking failure they observe is due to the reverse kl objective. 
 
 \subsection{The Data Distribution}
-In our 2D experiments, we take p_data(x) to be a 4x4 checkerboard placed on a support of [-2,2]. 
-We generate samples from p_data(x) as follows: 
+In our 2D experiments, we take $p_\text{data}(x)$ to be a 4x4 checkerboard placed on a support of [-2,2]. 
+We generate samples from $p_\text{data}(x)$ as follows: 
 \begin{enumerate}
     \item Sample \texttt{n\_samples} points uniformly within the unit square $[0,1]^2$. 
     \item Divide that unit square into a 4×4 grid, giving 16 cells (each 0.25 wide and tall)
@@ -1446,14 +1446,24 @@ We generate samples from p_data(x) as follows:
 
 \subsection{Defining the Inverse Problem}
 We define the following froward problem. 
-Given x ~ p_data(x), we compute an observation as y = Ax + e, where A = [0,1] and e ~ N(0, sigma^2), where we take sigma = 0.1 in our experiments, following VFM. 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where $A = [0,1]$ and $e ~ N(0, sigma^2)$, where we take $sigma = 0.1$ in our experiments, following VFM. 
 The task is to solve the Bayesian inverse problem, i.e. produce samples from 
 \[
 p_\text{data}(x|y) \propto \exp\left(-\frac{|y - Ax|^2}{2\sigma^2}\right) p_\text{data}(x),
 \]
-In words, given a measurement corresponding to the noised first coordinate of a sample from p_data, produce samples from p_data which also have the same first coordinate (up to measurement noise). 
+In words, given a measurement corresponding to the noised first coordinate of a sample from $p_data$, produce samples from $p_data$ which also have the same first coordinate (up to measurement noise). 
 Depending on where within [-2,2] the first coordinate lies, there are either 2 or 4 checkerboard squares which contain samples with matching first coordinate, again up to measurement noise. 
 In other words, depending on y, $p_\text{data}(x|y)$ has either 2 or 4 disconnected modes. 
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/true_posterior_y05_y0.pdf}
+\caption{Samples from the true posterior $p_\text{data}(x \mid y)$ of the checkerboard inverse problem for two observations (left: $y=0.5$, right: $y=0$). 
+We set the observation noise of the forward problem to $\sigma = 0.1$. 
+Black dots represents samples from the true posterior obtained by rejection sampling, while blue dots represent samples from the unconditional data distribution $p_\text{data}(x)$.
+}
+\label{fig:checkerboard_true_posterior}
+\end{figure}
 
 \subsection{Base Flow Map Training}
 For all methods which we evaluate, whether the method keeps the flow map frozen or fine tunes it, requires a base flow map which can generate samples from the unconditional checkerbaord data distribution, p_data(x). 
@@ -1495,26 +1505,101 @@ Adapter and flow map are optimised jointly by a single AdamW (learning rate 2×1
 For evaluation, we use the raw trained flow map rather than the EMA copy. 
 
 \subsection{Results}
+To visualise the performance of each method, for a given observation y=0.5, we plot 2000 samples from the trained noise adapter of each method. 
+We produce separate plots for the 2000 samples directly in the noise space, and for the 2000 samples after decoding via the flow map into data space.
+We additionally plot 20,000 standard normal samples in noise space, and the corresponding 20,000 decoded samples in data space.
+These 20,000 samples are coloured according to which checkerboard cell they land in, with grey indicating that that the sample does not land on a checkerboard cell. 
 
+We additionally report the metrics discussed in the evaluation framework section. For fairness, each method is evaluated on the same 10,000 observations, with 100 samples drawn from each method for each observation.
 
+\begin{figure}[p]
+\centering
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{m{3.0cm} m{0.26\linewidth} m{0.26\linewidth}}
+\small\mbox{(a) Gaussian (rKL)} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/a_data.pdf} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/a_noise.pdf} \\
+\small\mbox{(b) Gaussian (fKL)} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/b_data.pdf} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/b_noise.pdf} \\
+\small\mbox{(c) VFM} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/c_data.pdf} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/c_noise.pdf} \\
+\small\mbox{(e) NF (rKL)} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/e_data.pdf} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/e_noise.pdf} \\
+  \small\mbox{(d) NF (fKL)} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/d_data.pdf} &
+  \includegraphics[width=\linewidth]{figures/thesis_panels/d_noise.pdf} \\
+\end{tabular}
+\caption{
+    TO-DO
+% Posterior samples at $y=0.5$ with $K=4$ decoding. Left column: data
+% space; $2000$ samples from each method (black) over $20000$ unconditional
+% flow-map samples, coloured by the filled cell in which they land (grey: off
+% support); the dashed line marks $x_1 = y$. Right column: the same samples and
+% colouring in noise space. Rows (a), (b), (d), (e) use the frozen flow map;
+% row (c) uses the flow map jointly fine-tuned by VFM.
+}
+\label{fig:checkerboard_results}
+\end{figure}
 
-full page figure
-true p(y | x)
-Gaussian strawman rkl 
-Gaussian strawman fkl
-NF adapter rkl
-NF adapter fkl
-VFM
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l cc cc c}
+\toprule
+ & \multicolumn{2}{c}{Gaussian} & \multicolumn{2}{c}{NF} & \multirow{2}{*}{VFM} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+ & rKL & fKL & rKL & fKL & \\
+\midrule
+NLPD $\downarrow$ & $-0.773$ & $-0.447$ & $-1.000$ & $-0.932$ & $\mathbf{-1.038}$ \\
+CRPS $\downarrow$ & $0.758$ & $0.632$ & $0.620$ & $0.619$ & $\mathbf{0.614}$ \\
+SACC $\uparrow$ & $\mathbf{0.927}$ & $0.902$ & $0.907$ & $0.885$ & $0.915$ \\
+$\mathrm{MMD}(q_{\phi,\theta},\, p_\theta)$ $\downarrow$ & $0.2828$ & $0.0747$ & $0.0361$ & $0.0399$ & $\mathbf{0.0307}$ \\
+$\mathrm{MMD}(p_\theta,\, p_\text{data})$ $\downarrow$ & $0.0398$ & $0.0398$ & $0.0398$ & $0.0398$ & $\mathbf{0.0327}$ \\
+$\mathrm{MMD}(q_{\phi,\theta},\, p_\text{data})$ $\downarrow$ & $0.2980$ & $0.0857$ & $0.0454$ & $0.0472$ & $\mathbf{0.0327}$ \\
+\bottomrule
+\end{tabular}
+\caption{Checkerboard inverse problem, evaluated over $B=10{,}000$ shared
+observations with $J=100$ posterior samples each, $K=4$ decoding, $\sigma=0.1$
+(means over observations; MMD rows are per-observation MMDs between
+$J$-sample sets, in data space). The Gaussian and NF columns use the frozen
+flow map and therefore share $\mathrm{MMD}(p_\theta, p_\text{data})$; VFM uses
+its jointly fine-tuned map. Best per row in bold.}
+\label{tab:checkerboard_results}
+\end{table}
 
-6 rows, 2 columns. first column corresponds to data space, second column corresponds to noise space. 
-for p(y | x), second column for noise space is empty 
-all using K=4. 
+We see in table~\ref{tab:checkerboard_results} that MMD between q_{φ,θ}(x | y) and p_data(x | y) is lower for VFM than for frozen-theta methods. 
+In fact, the MMD for VFM is statistically indisstinguisable from 0: when computing MMD between two distinct sets of J=100 samples of p_data(x | y) obtained by rejection sampling, and averaging over 10,000 observations, we obtain 0.0295. 
+This is very close to the MMD scores ~0.03 for VFM. 
 
-Table with columns Method, NLPD, CRPS, SACC, MMD between (1) and (2), MMD between (2) and (3), MMD between (1) and (3)
+The fact that MMD between p_theta(x | y) and p_data(x | y) is lower for VFM than for frozen-theta methods tells us that fine-tuning the flow map reorganises the noise-space geometry in such a way that the theoretical best possible distribution that the noise adapter can hope to learn (i.e. p_theta(x | y)) is closer to the true posterior, p_data(x | y)) for VFM than for frozen-theta methods. 
+To isolate how well the noise adapter learns the theoretical best possible distribution, we consider MMD between q_{φ,θ}(x | y) and p_θ(x | y).
+This isolates the error of the noise adapter.
+We see that even after isolating the error of the noise adapter, VFM has the best MMD, with our NF adapters closely trailing behind. 
+We believe this is because in VFM, fine-tuning theta has allowed the noie space to warp such that p_theta(z | y) is much easier for the noise adapter to learn compared to when theta is frozen. 
+The figures confirm this: for frozen theta,  p_theta(z | y) (with y=0.5) has two near-disjoint modes, whereas for VFM,  p_theta(z | y) has a single mode and so can be easily approximated with a simple Gaussian. 
+We see that  MMD(q_{φ,θ}, p_θ) is worst for Gaussian adapter trained with rKL. The figures show why - the adapter fails to learn all modes. 
+The Gaussian adapter trained with fKL has better MMD, however still behind the NF adapter. 
+Again, the figures show why visually: a simple Gaussian cannot represent a multimodal distribution without placing mass between the separate modes. 
+On the other hand, the figures show that the NF adapter (both when trained with rKL and fKL) is able to concentrate its mass at all modes of p_data(x | y), without placing significant mass between them. 
+The NLPD and CRPS metrics are generally consistent with the MMD metrics. 
+The main exception is that Gaussian adapter trained with rKL has better NLPD than when it is trained with fKL, despite having worse MMD.
+This is because NLPD only evaluates the consistency of produced samples with the measurement y, and hence is blind to whether such samples cover all modes of p_data(x | y).
 
-
+The SACC scores are generally high for all methods and hence show that the decoded samples land on the checkerboard squares around 90\% of the time. 
+The Gaussian adapter trained with rKL has the best SACC, and this is likely explained by the fact that it only produces samples from one checkerboard square of p_data(x | y), and hence is less likely to produce samples which land off the checkerboard squares.
+We note that, in general, good SACC is determined by the noise adapter producing samples which do not deviate from the N(0,I) prior, and the flow map is accurate. 
+Visually, we can see that the noise adapter is producing samples within N(0,I) prior. 
+Hence our reported SACC scores for all methods are mainly limited by the flow map itself rather than the noise adapter. 
+To confirm this, we also decoded 10,000 standard normal samples via the K=4 flow map to generate 10000 corresponding unconditional samples and compute SACC for these samples. For the frozen theta flow map, we find that SACC is 0.893, and for the jointly trained flow map of VFM, we find that SACC is 0.905. 
+The SACC scores reported in Table~\ref{tab:checkerboard_results} are all around 0.9, indicating that the noise adapter is not predominantly to blame for the SACC scores not being closer to 1, but rather the flow map itself.
 
 \section{Image Inverse Problems}
+
+
 \subsection{Common Setup}
 \subsubsection{Base Flow Map}
 \textbf{Evaluating the Flow Map}
