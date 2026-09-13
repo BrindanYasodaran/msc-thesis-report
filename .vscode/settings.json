@@ -61,6 +61,31 @@
   "latex-workshop.formatting.latexindent.path": "/Library/TeX/texbin/latexindent",
   "latex-workshop.texdoc.path": "/Library/TeX/texbin/texdoc",
 
+  // ---------------------------------------------------------------------
+  // Ghost text off for LaTeX: the grey italic continuation that appears
+  // ahead of the cursor.  Provider-agnostic, so it covers Copilot and
+  // anything else registering an inline-completion provider.
+  //
+  // The completion POPUP is deliberately left on -- it is what supplies
+  // citation keys from references.bib, \ref labels, and command names.
+  // ---------------------------------------------------------------------
+  "[latex]": {
+    "editor.inlineSuggest.enabled": false,
+
+    // Soft-wrap long lines at the window edge (prose reads better wrapped;
+    // this is display-only and never inserts real line breaks).
+    "editor.wordWrap": "on"
+  },
+
+  // Mirrors Copilot's own defaults, with latex added.
+  "github.copilot.enable": {
+    "*": true,
+    "latex": false,
+    "plaintext": false,
+    "markdown": false,
+    "scminput": false
+  },
+
   // Rebuild on save; jump the PDF to the cursor after each build.
   "latex-workshop.latex.autoBuild.run": "onSave",
   "latex-workshop.synctex.afterBuild.enabled": true,
