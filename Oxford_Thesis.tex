@@ -1265,9 +1265,9 @@ This is invertible assuming that we have y.
 We find in practice that as long as the observation encoder is sufficiently expressive, how the encoding information is delivered to the flow does not make a significant difference. 
 Furthermore, while it is posible to pre-train the observaion encoder, we jointly train its prameters with the normalising flow, optimising the same forward or reverse kl objective. 
 
-Final note: How we ensure that the NF initialises as the identity? 
-%we can look at notes for 'clean repo, understand code' it has more details. 
-
+As a final implementation detail, we zero-initialise each autoregressive layer's output
+projection, so that every affine transformation starts as the identity.
+The adapter is therefore \emph{exactly} the standard normal $q = \mathcal{N}(0, I)$ at initialisation, and training starts at the noise prior.
 
 \section{Evaluation Framework}
 Ultimately, the goal of inverse problem solving is, assuming a particular forward problem which acts on data x ~ p_data, and given an observation y*, produce samples from p_data which are 'consistent with the observation y*. 
@@ -1309,9 +1309,24 @@ For simple low-dimensional experiments, rejection sampling can often be used to 
 In particular, sample x from p_theta, accept with probability p(y* | x). By construction, we will obtain samples distributed according to p_theta(x | y*). We can use the same procedure to generate samples from p_data(x | y*). 
 However, for image-scale experiments, the acceptance probability will be so low that it is computationally infesible to obtain sufficient samples from p_theta(x | y*). 
 
+Can we compute MMD between any pair of distributions out of (1), (2) and (3) in
+practice? 
+Our method directly gives us samples from (1). 
+For (2) and (3), we use rejection sampling. 
+
+\textbf{Rejection Sampling}
+Given a target of the form $\pi(x) \propto p(x)\,w(x)$, where $p$ is a distribution we can sample from and the weight satisfies $0 \le w(x) \le M$ for a known bound $M$, drawing $x \sim p$ and accepting it with probability $w(x)/M$ yields exact samples from
+$\pi$. 
+Both (2) and (3) have this form: the proposal $p$ is $p_\theta(x)$ or $p_\text{data}(x)$ respectively, the weight is the likelihood $w(x) = p(y^* \mid x)$, and $M$ is its maximum value. 
+
+The expected acceptance rate is $\mathbb{E}_{p}[w(x)]/M$, which is only practical when the proposal
+places non-negligible mass in the region consistent with $y^*$. 
+This holds for our low-dimensional experiments, but for image-scale experiments with high-dimensional observations the acceptance rate is vanishingly small, so obtaining samples from (2) or (3) is computationally infeasible.
+
 Therefore, we must consider alternative metrics for image-scale experiments, which indirectly give evidence of whether the inverse problem solving method is successfully producing samples from p_data(x | y*). 
 
 We now discuss such metrics. We separate the metrics we use for low-dimensional experiments, and the metrics we use for image scale experiments. 
+
 \subsubsection{Additional metrics for Low-dimensional experiments}
 Given an observation y in R, the output of all inverse problem solving methods that we evaluate (both ours and baseline methods), are N samples (x_i)_i=1^N from a distribution approximating p_data(x | y).
 For VFM, such N samples are obtained by sampling from the noise adapter, z_i = q_phi(z | y), and denoising via the flow map x_i = f_theta(z_i). 
@@ -1598,70 +1613,152 @@ To confirm this, we also decoded 10,000 standard normal samples via the K=4 flow
 The SACC scores reported in Table~\ref{tab:checkerboard_results} are all around 0.9, indicating that the noise adapter is not predominantly to blame for the SACC scores not being closer to 1, but rather the flow map itself.
 
 \section{Image Inverse Problems}
-
+We now move on to several inverse problem settings where the data distribution p_data(x) is now over images. 
+In particular, for all our experiments, we use the CIFAR-10 dataset, which consists of 60,000 32x32 images, with 3 RGB colour channels. 
+The dataset consists of 10 mutually exclusive classes (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck), with 6,000 images per class.
+The dataset is split into 50,000 training images and 10,000 test images. 
+There is no official validation split, but we set aside a fixed, randomly selected subset of 1,000 test-set images as a validation set, used during training for monitoring and for saving the best model checkpoints.
 
 \subsection{Common Setup}
 \subsubsection{Base Flow Map}
-\textbf{Evaluating the Flow Map}
-\subsubsection{TarFlow Noise Adapter Hyerparameters}
-For brightness:
-tokenisation - 4x4 patches, which gives 64 tokens, each of 48 dims
-number of blocks - NB=4
-layers per block - LPB = 2 causal self-attention layers
-residual stream dimension - CH = 256
-attention head info: 4 heads, each of internal dimension 64. head outputs are concatenated, before being passed through Linear(256 → 256)
-MLP expansion - 4, i.e. MLP expands 256 residual stream into 256x4
-6.6M parameters in all. (no conditioning)
+Our method requires a base flow map which can generate samples from the unconditional data distribution, p_data(x).
+We use the released weights of the flow map released by the authors of MeanFlow (Geng et al., 2025).
+The authors train an unconditional flow map (no class labels)using the MeanFlow algorithm on the CIFAR-10 training set. 
+They use a U-Net (Song et al.) with 55.9M parameters, operating directly in pixel space rather than in latent space. 
+We note that in their imagenet experiments, VFM use trains a class-conditioned flow map which operates in a latent space of a pretrained autoencoder, rather than directly in pixel space.
 
-Optimiser: Adam (0.9, 0.999), LR 5e-4 cosine → 1e-5, grad-clip 5.0, 
+The authors release 4 separate weight sets: the raw trained weights plus three EMA copies at decays 0.9999 / 0.99995 / 0.9996. We use the EMA copy with decay 0.99995 throughout, as it attains the best FID.
+Before using this flow map in our experiments, we first validate the authors' reported sample quality using the same FID evaluation pipeline of the original authors. 
+In particular, we generate 50,000 samples from the flow map and compute FID against the full 50,000-image training set. 
+We obtained an FID of 2.812, matching their reported value. 
 
-PyTorch 2.13/cu130, single RTX A5000
+\subsubsection{TarFlow Noise Adapter Hyperparameters}
+For all CIFAR-10 inverse problem settings, our method uses the TarFlow architecture (Section~\ref{subsec:background_tarflow}) for the noise adapter. 
+We now give the hyperparameters of the TarFlow architecture, which are shared across all inverse problem settings.
+Images are tokenised with $4 \times 4$ patches, giving $K = 64$ tokens of dimension $4 \cdot 4 \cdot 3 = 48$. 
+We use $\texttt{num\_blocks} = 4$ autoregressive blocks, each block containing $\texttt{LPB} = 2$
+transformer layers. 
+Each tranformer layer projects each token to a dimension of $\texttt{CH} = 256$. 
+Within each transformer layer, each attention layer uses 4 heads of dimension 64, and the head outputs are concatenated
+and mixed by an output projection $\text{Linear}(256 \to 256)$. 
+Each MLP uses an expansion factor of 4, i.e.\ $\text{Linear}(256 \to 1024) \to \text{GELU} \to \text{Linear}(1024 \to 256)$. 
+The unconditional adapter has 6.53M parameters.
+
+The main difference across different inverse problem settings is the dimension of the observation y, which determines how we give the observation as input to the TarFlow adapter.
+We describe how we condition the TarFlow adapter on the observation y separately for each inverse problem setting in their respective sections.
+The learning rate, number of training steps and batch size are likewise tuned per setting. 
+All training uses the Adam optimiser with gradient-norm clipping at 5.0. 
+All experiments run in PyTorch~2.13 (CUDA~13.0) on a single RTX~A5000. 
 
 \subsection{Brightness Steering}
-The forward problem: y = Ax + e. 
-Here, A: R^D -> R, computes the mean of all 3*32*32 pixel values. 
-These pixel values are in [-1,1] for cifar10 
-We choose e to be Gaussian with mean 0 and sigma=0.05 .
-sigma is chosen to be small enough so that samples from p(x | y) are visibly different from p(x), but large enough so that it is feasible to obtain samples from p(x | y) via rejection sampling (we measured around 9\% acceptance). 
+Before progressively increasing the difficulty of the inverse problems we consider, we first consider a simple inverse problem where the observation y is a single scalar value corresponding to the mean brightness of the image.
+In particular, we define the forward problem as follows. 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 → R is the mean over all 3·32·32 pixel values, with each pixel in [-1, 1],  ε ~ N(0, σ²), σ = 0.05. 
+We choose σ to be small enough so that samples from p(x | y) are visibly different from p(x), but large enough so that it is copmutationally feasible to obtain samples from p_data(x | y) via rejection sampling (we measured around 9\% acceptance). 
 
-The inverse problem is then, given measurement y*, determine samples from p(x | y*). 
-For this task, we fix y*=0.2. We chose this value of y* because it is roughly one standard deviation above the mean brightness level (of 4000 generated samples from the flow map). 
+As always, the task is to solve the Bayesian inverse problem, i.e. produce samples from p_data(x | y). 
+For this simple setting, we only consider a single fixed observation y* = 0.2, which is roughly one standard deviation above the mean brightness level (of 4000 generated samples from the flow map).
+Hence we train unconditional noise adapters to approximate p_data(x | y*) for this fixed y*. 
+We only consider a single fixed observation y* because we want to isolate the failure of a Gaussian adapter to the lack of expressivity of the Gaussian distribution, rather than any failure due to amortisation, often referred to as the Amortisation gap in the literature.
 
-We wanted to progressively increase the difficulty of the inverse problems that we choose. In practice, this means choosing inverse problems with progressively larger dimension measurement. Hence we started with an inverse problem with a 1D measurement. We specifically chose brightness as the measurement because it allows us to visually determine the effectiveness of the noise adapters that we test. 
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{brightness_panels/block_uncond}
+  \caption{Unconditional, $p_\theta(\mathbf{x})$}
+\end{subfigure}\\[8pt]
+\begin{subfigure}{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{brightness_panels/block_posterior}
+  \caption{Posterior, $p_\theta(\mathbf{x} \mid y^{*})$}
+\end{subfigure}
+\caption{Samples from (a) the unconditional flow map and (b) the posterior
+$p_\theta(\mathbf{x} \mid y^{*})$ obtained by rejection sampling, for
+$y^{*} = 0.2$. Conditioning visibly brightens the samples.}
+\label{fig:brightness_prior_posterior}
+\end{figure}
 
-Aside from using this experiment as evidence that the normalising flow adapter works for image-level problems, so that we can move on to harder image inverse problems, the point of this experiment is to give evidence that a Gaussian adapter is insufficient. 
-This is why we did not do amortisation here. 
-We want to isolate the failure of a Gaussian adapter to the lack of expressivity of the Gaussian distribution, rather than any failure due to amortisation, often referred to as the Amortisation gap in the literature. 
+\subsubsection{Adapter Training}
+We compare a diagonal Gaussian adapter and a Normalising Flow adapter, both keeping the flow map frozen.
+As we are no longer amortising over the observation y, for the diagnoal Gaussian adapter, we directly optimise its mean and variance parameters, both R^3072.
+While it is possible to use full covariance Gaussian, it would be computationaly infesible when moving to the amortised setting. 
+In particular, for D=3072, the covariance matrix would have 4.72M entries.
+An output layer that maps an e.g. 512 dimension feature vector to 4.72M values, would require 2.4 billion parameters. 
 
-Additionally, rejection sampling is computationally feasible, and so this enables more rigorous evaluation (we can directly compare with ground truth samples from p_data(x | y*)) before moving on to harder inverse problems, where we can't do such rigorous evaluation. 
+We train the Gaussian and Normalising Flow adapters using the reverse KL objective. 
+Futhermore, we additionally train a separate Gaussian adapter using the forward KL objective in order to show that the failure of the Gaussian adapter is due to the lack of expressivity of the Gaussian distribution, rather than the mode seeking nature of the reverse KL objective.
+Training via forward KL requires samples from p_theta(z | y*), which we obtain by rejection sampling from the frozen flow map.
+We collect 50,000 such samples for training. 
+For a diagonal Gaussian, minimising fKL (or equivalently, maximising the likelihood) can be performed in closed form rather than by gradient descent. 
 
-\subsubsection{Gaussian Adapter Training}
-We use diagonal gaussian, and we directly optimise its mean and variance. 
-While it is possible to use full covariance gaussian, it would be computationaly infesible when moving to the amortised setting. 
-In particular, for D=3072, the covariance matrix would have 4.72M entries. An output layer that maps an e.g. 512 dimension feature vector to 4.72M values, would require 2.4 billion parameters. 
-The original VFM authors also use diagonal gaussian for their noise adapter. 
-As we we are only trying to approximate a single distribution p(x | y*), there is no need to train a neural network as for the amortised case. 
-logσ clamped to [−6, 3]; initialised at μ = 0, logσ = 0. 
+When using the reverse KL objective, we oprimise the mean and variance parameters of the Gaussian using Adam (learning rate 2x10⁻⁴, cosine decay to 10⁻⁵), batch size 128, for 6,000 steps. Before training, we initialise the mean and variance to be the prior, i.e. μ = 0, sigma=1. 
+We also optimise the normalising flow parameters with Adam for 6{,}000 steps at bath size 64, with a learning rate of $2\times10^{-4}$ decayed to $10^{-5}$ by a cosine schedule.
 
-We optimise the mean and variance in two ways: maximum likelihood, and reverse KL. 
+\subsubsection{Results}
+To visualise the performance of each method, Figure~\ref{fig:brightness_adapters} shows samples produced by decoding noise samples from each trained noise adapter via the frozen flow map. 
+Comparing to samples from Figure~\ref{fig:brightness_prior_posterior}b, we see that the NF adapter and even the Gaussian adapter trained with forward KL produces samples which visually match samples from p_theta(x | y). 
+On the other hand, the Gaussian adapter trained with reverse KL produces images which are predominantly characterised by the top hald of the image being white, and the bottom half being darker. This indicates that the Gaussian adapter has learned to produce samples from one mode of p_theta(z | y*) rather than the full distribution, which is as expected when training with reverse KL.
 
-In maximum likelihood, we have a dataset of observations from the true p(y* | x). We can then compute the maximum likelihood estimate of the mean and variance in closed form. no need for optimisation. The only problem with this is that to obtain a good maximum likelihood estimate, we require a very large number of observations. 
+We also provide a quantitative evaluation of each method. Because we do not amortise over the observation y, we do cannot follow the evaluation framework of Section~\ref{sec:eval_framework}. In particular, as outlined in the framework, the PSNR, SSIM and LPIPS metrics evaluare the similarity of a single sample produced by the inverse problem solving method to a single sample from the true posterior p_data(x | y*), and average over the observation y. Hence, these metrics are not applicable in this setting, where we have a single fixed observation y*.
 
-For reverse KL, the objective is what we already know. 
-We can compute the KL between the gaussian and the prior standard normal exactly (no need for sample based estimator). 
+Instead, for each method we produce 50,000 samples from the trained noise adapter and decode them via the frozen flow map and compare against 50,000 samples from the posterior p_theta(x | y*) obtained by rejection sampling.
+For each method, we compute the similarity of its produced samples and the true posterior samples using various metrics as shown in table~\ref{tab:brightness_steering}.
 
-We update mean and variance parameters using gradient descent.
-We can use Adam, learning rate 2e-4, cosine-annealed → 1e-5 over the run. (this was tuned), batch 128 for 6000 steps. 
-gradient clip of 5. 
+We see that the mean and standard deviation of the brightness values of the samples produced by the NF adapter is 0.184 and 0.064 respectively, which is very close to the mean and standard deviation of the true posterior samples, which are 0.1887 and 0.0498 respectively. 
+On the other hand, the brightness standard deviation of both Gaussian adapters are significantly higher than the true posterior, indicating that they have failed to capture the spread of brightness values of the true posterior.
+To further quantify this, we compute the Wasserstein-1 distance between the brightness values of the samples produced by each method and the true posterior samples. 
+Finally, we compute FID and MMD between both sets of samples, using the same Inception-v3 feature space as in Section~\ref{sec:eval_framework}.
+We see that the Gaussian adapter trained with reverse KL has especially poor FID and MMD, which is consistent with the visualisation of its samples in Figure~\ref{fig:brightness_adapters}. 
+We note that the NF adapter has an FID of 0.98, which is lower than the FID of 2.81 of the unconditional flow map to the cifar10 train set. 
+This unusually low FID is because we are comparing with p_theta(x | y*) rather than p_data(x|y*).
 
-Results: rkl diag is bad. fkl diag is quite good. 
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{brightness_panels/block_gauss_rkl}
+  \caption{Gaussian (rKL)}
+\end{subfigure}\\[8pt]
+\begin{subfigure}{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{brightness_panels/block_gauss_fkl}
+  \caption{Gaussian (fKL)}
+\end{subfigure}\\[8pt]
+\begin{subfigure}{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{brightness_panels/block_nf_rkl}
+  \caption{NF (rKL)}
+\end{subfigure}
+\caption{Samples from each noise adapter for $y^{*} = 0.2$. The rKL Gaussian
+(a) produces dark, off-manifold samples; the fKL Gaussian (b) overshoots the
+brightness spread, with samples ranging from too dark to too bright; the NF
+adapter (c) matches the posterior closely.}
+\label{fig:brightness_adapters}
+\end{figure}
 
-
-\subsubsection{Noise Adapter Training details}
-6000 steps
-Batch 64
-
-\subsubsection{NF vs Gaussian Adapter Ablation}
+\begin{table}[t]
+\centering
+\begin{tabular}{l cc c}
+\toprule
+ & \multicolumn{2}{c}{Gaussian} & NF \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-4}
+ & rKL & fKL & rKL \\
+\midrule
+Brightness mean            & 0.186 & 0.205 & \textbf{0.184} \\
+Brightness std             & 0.191 & 0.278 & \textbf{0.064} \\
+$W_1$ (brightness)         & 0.111 & 0.186 & \textbf{0.012} \\
+FID                        & 35.29 & 3.12  & \textbf{0.98}  \\
+Feature MMD                & 0.150 & 0.030 & \textbf{0.003} \\
+\bottomrule
+\end{tabular}
+\caption{Brightness steering ($y^{*}=0.2$, $\sigma=0.05$), 50{,}000 samples per
+method. The oracle posterior (rejection sampling through the frozen flow map) has
+brightness mean $0.189$ and std $0.050$. $W_1$ compares each method's brightness
+marginal against the oracle's; FID and feature-space MMD compare generated images
+against oracle posterior samples in Inception feature space. Best in bold.}
+\label{tab:brightness_steering}
+\end{table}
 
 \subsection{Super-Resolution}
 The forward problem: y = Ax + e. 
