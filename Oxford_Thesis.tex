@@ -1188,12 +1188,14 @@ After training with weight 0 for rkl term (i.e. fkl only), we compute the fracti
 R = ‖g_rkl‖ / (‖g_fkl‖ + w‖g_rkl‖) e.g.  ‖g_fkl‖ = 105, ‖g_rkl‖ = 9727, so R = 93;
 we then pick w such that the gradient share progressively increases from 5 \%, 15 \%, 40 \%, 55 \%
 note that this is relatively arbitrary
-note that the ratio drifts during trianing so realised shares deviate from target share
+note that the ratio drifts during trianing so realised shares deviate from target share. 
 
-To determine what fraction total gradient the rkl term should take up, we try different weight ramps. 
-In practice, we keep the same weight ramp, and we add a coefficient on the rkl term. 
-This way there is only one hyperparameter, and the only thing that changes is not the steepness of the ramp, but the scale of the ramp. 
-This is beta-VAE. %maybe show some maths here?
+\subsection{$\beta$-VAE}
+In the reverse KL objective, the observation term rewards matching the observation, while the KL to prior term ensures that the learned distribiution does not deviate from the standard normal, subsequently ensuring that the noise adapter produces diverse samples which the flow map expects as input. 
+To control the balance between these two forces, we can tune a coefficient $\beta$ on the observation term
+L = L_fkl + w(step) · E_q[ log q(z|y) − log p(z) + β‖A f_θ(z) − y‖² / 2σ² ]
+
+We can use this coefficient on the rKL term in combination of the mixed objective. 
 
 %we should really give an algorithm which outlines training (like in the VFM paper)
 
@@ -1874,13 +1876,13 @@ In other words, p_data(x | y) for a given observation y geneuniely represents a 
 \begin{table}[t]
 \centering
 \small
-\begin{tabular}{l cccccc}
+\begin{tabular}{l ccccccc}
 \toprule
-Objective & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ \\
+Objective & Residual $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ \\
 \midrule
-rKL   & 18.28 & 0.365 & 0.089 & 26.05 & 0.112 & 9.65 \\
-fKL   & 17.06 & 0.347 & 0.076 & \textbf{7.90} & \textbf{0.031} & \textbf{8.53} \\
-Mixed & \textbf{18.58} & \textbf{0.404} & \textbf{0.070} & 11.14 & 0.051 & 8.67 \\
+rKL   & 1.97 & 18.28 & 0.365 & 0.089 & 26.05 & 0.112 & 9.65 \\
+fKL   & 2.17 & 17.06 & 0.347 & 0.076 & \textbf{7.90} & \textbf{0.031} & \textbf{8.53} \\
+Mixed & \textbf{1.61} & \textbf{18.58} & \textbf{0.404} & \textbf{0.070} & 11.14 & 0.051 & 8.67 \\
 \bottomrule
 \end{tabular}
 \caption{Objective ablation on $4\times$ super-resolution, evaluated on the
@@ -1909,12 +1911,18 @@ All guidance baselines we evaluate aside from DAPS all guide trajectories by nud
 To ensure a rigorous comparison, each baseline method's hyperparameters are selected by a hyperparameter search on the fixed 1k sample validation set. 
 We consider the number of Euler integration steps performed by each method as a hyperparameter, and subsequently report the number of function evaluations (NFE) used by each method in Table~\ref{tab:sr_baselines}. 
 
-For comparison, we jointly train a Gaussian adapter with the flow map, using VFM's training objective. We use AdamW with learning rate $10^{-4}$ for both networks and batch size 64. We tried training for various number of steps, ultimately choosing to train for 2000 total steps as training for longer degraded the ability of the flow map to act as an unconditional generator. 
+As an additional baseline, we jointly train a Gaussian adapter with the flow map, using VFM's training objective. We use AdamW with learning rate $10^{-4}$ for both networks and batch size 64. We tried training for various number of steps, ultimately choosing to train for 2000 total steps as training for longer degraded the ability of the flow map to act as an unconditional generator. 
 
-For evaluation, we provide samples from each method in Figure~\ref{fig:sr_baselines_qualitative} and evaluate each method using the 9k test samples via the evaluation framework in the method section. 
+To evaluate our method against the baselines, we show samples from each method in Figure~\ref{fig:sr_baselines_qualitative}. 
+We additionally compute the metrics outlined in the evaluation framework, on the test set. 
 Table~\ref{tab:sr_baselines} shows that no method dominates for this super-resolution task. 
-We see that FlowDPS performs best on PSNR and SSIM, however Figure~\ref{fig:sr_baselines_qualitative} , shows that FlowDPS produces the blurriest samples. Given that PSNR and SSIM rewards samples at the mean of p_data(x | y), this is expected. 
-
+We see that FlowDPS performs best on PSNR and SSIM, however as previously discussed, these metrics reward samples at the mean of the posterior, p_data(x | y), which is typically a blurry interpolation between real posterior samples. This is confirmed by Figure~\ref{fig:sr_baselines_qualitative}, which shows that of all methods, FlowDPS produces the blurriest samples. Additionally, FlowDPS has the worst FID of all methods. 
+Our method performs best on MMD, and is closely behind FlowChef on FID, signifying that our method can produce realistic images which are on the data manifold. 
+We note that all FID scores are upwardly biased due to the fact that we only evaluate on a 9k test set (copmared to the 50k samples used to evaluate the base flow map). 
+VFM beats our method on all per-sample fidelity metrics, which indicate that samples produced by VFM are more consistent with the observation. 
+However our method beats VFM on CRPS which indicates our method produces more diverse samples, and on FID and MMD which indicates that our method produces samples which are more realistic to the cifar10 data distirbition. 
+This is to be expected since fine-tuning the flow map for this specific super-resolution task may result in degradation of the flow map to generate realistic samples.
+Importantly, while all guidance methods require at least 28 NFE, our method only requires 1. This especially matters when scaling our method to larger image settings, where neural network forward passes become much more expensive. Furthermore, while VFM also requires 1 NFE, it is the only method we evaluate which does not keep the unconditional generator frozen. Hence our method provides competetitive performance for super-resolution, while being the only method which uses 1 NFE and does not fine-tune the unconditional generator.  
 
 \begin{figure}[t]
 \centering
@@ -1939,19 +1947,19 @@ fine-tunes the flow map (checkpoint selected at step 2{,}000)...}
 \begin{table}[t]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{l c cccccc c}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l c ccccccc c}
 \toprule
-Method & NFE & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ & Time (s) $\downarrow$ \\
+Method & NFE & Residual $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ & Time (s) $\downarrow$ \\
 \midrule
-DPS       & 500 & 19.67 & 0.468 & 0.049 & 12.68 & 0.082 & 8.47 & 0.623 \\
-DAPS      & 500 & 18.37 & 0.368 & 0.061 & 28.96 & 0.135 & 9.08 & 0.643 \\
-MPGD      & 100 & 18.94 & 0.416 & 0.053 & 17.44 & 0.100 & 8.77 & 0.115 \\
-FlowChef  & 100 & 18.85 & 0.433 & 0.049 & \textbf{10.87} & 0.067 & \textbf{8.31} & 0.140 \\
-FlowDPS   & 28  & \textbf{20.56} & \textbf{0.515} & 0.083 & 53.82 & 0.206 & 9.96 & 0.032 \\
+DPS       & 500 & 0.80 & 19.67 & 0.468 & 0.049 & 12.68 & 0.082 & 8.47 & 0.623 \\
+DAPS      & 500 & 1.19 & 18.37 & 0.368 & 0.061 & 28.96 & 0.135 & 9.08 & 0.643 \\
+MPGD      & 100 & \textbf{0.77} & 18.94 & 0.416 & 0.053 & 17.44 & 0.100 & 8.77 & 0.115 \\
+FlowChef  & 100 & 0.84 & 18.85 & 0.433 & 0.049 & \textbf{10.87} & 0.067 & \textbf{8.31} & 0.140 \\
+FlowDPS   & 28  & \textbf{0.77} & \textbf{20.56} & \textbf{0.515} & 0.083 & 53.82 & 0.206 & 9.96 & 0.032 \\
 \midrule
-VFM       & 1 & 19.40 & 0.452 & \textbf{0.046} & 18.50 & 0.092 & 9.30 & 0.003 \\
-NF (ours) & 1 & 18.58 & 0.404 & 0.070 & 11.14 & \textbf{0.051} & 8.67 & \textbf{0.002} \\
+VFM       & 1 & 0.99 & 19.40 & 0.452 & \textbf{0.046} & 18.50 & 0.092 & 9.30 & 0.003 \\
+NF (ours) & 1 & 1.61 & 18.58 & 0.404 & 0.070 & 11.14 & \textbf{0.051} & 8.67 & \textbf{0.002} \\
 \bottomrule
 \end{tabular}
 \caption{Comparison with training-free guidance baselines and VFM on $4\times$
@@ -1967,14 +1975,39 @@ RTX A5000. Best in bold.}
 \label{tab:sr_baselines}
 \end{table}
 
-
-
-
-
 \subsection{Inpainting}
+We finally test the efficacy of our method in an inpainting inverse problem setting. 
+In particular, we define the forward problem as follows, 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 -> R^3072 masks a central 12x12 box with zeroes, e ~ N(0, σ²I) with σ = 0.05. 
+
 \subsubsection{Noise Adapter Training details}
 \textbf{Conditioning mechanism}
+Unlike in super-resolution, the observation for inpainting has the same resolution as full image. 
+Hence, we must modify the mechanism that we use to input the observation to the TarFlow noise adapter. 
+Given a 3x32x32 observation, we first process it using a CNN with residual blocks which downsamples the spatial resolution from 32x32 to 8x8 and increases the number of channels to 64 (i.e. we have 64 8x8 feature maps). 
+Hence, for each of the 8^2=64 spatial positions of the output feature map, we have a 64-dimensional feature vector. 
+We have a one-to-one spatial correspondence between the 64 observation feature vectors and 64 flow tokens. 
+We additionally apply two transformer layers over the 64 observation feature vectors so that each feature vector can easily encode context from the whole observation. 
+This is important because filling the masked region requires context from the whole image, not just a local region. 
+After applying the transformer layers over the observation features vectors, we give them as input to each block as described in the method section. 
+Due to the much larger observation encoding CNN, we now have 13.02M total parameters. 
+
+
 \subsubsection{$\beta$-VAE Ablation}
+Intuitively, ensuring that our method produces samples whose pixels match the given observation is much more difficult for inpainting compared to super-resolution. 
+This is because the inpainting task provides an observation which specifies exactly the values of 880 pixels (up to measurement noise) that the samples must adhere to. 
+Recall that in the method section, we discussed that we can tune a $\beta$ coefficient on the observation term of the rkl loss to control how much the noise adapter is rewarded for producing samples which adhere to the measurement. 
+Hence, in this section, we investigate the effect of increasing $\beta$ in the inpainting setting. 
+In particular, we for each β ∈ {1, 10, 20, 50, 100, 200, 500, 1000}, we train a separate normalising flow adapter, with all other hyperparameters fixed. 
+Due to limited compute, we only train each adapter for 6k steps.
+Furthermore, we use a mixed objective, with wheight schedule determined according to the procedure outlined in the method section. 
+In particular, the weight on the reverse-KL term is zero for the first 3,500 steps and is then raised at five points: $w = 2\times10^{-5}$ at step 3,500, $6\times10^{-5}$ at 4,000, $2\times10^{-4}$ at 4,500, $6\times10^{-4}$ at 5,000 and $2\times10^{-3}$ at 5,500. 
+We use Adam optimiser with learning rate 1×10⁻³ decayed to 1×10⁻⁵ by a cosine schedule, batch 128 for the fKL term and 32 for the rKL. 
+
+Figure~\ref{fig:inp_beta_ablation} shows samples obtained using noise adapters traineg using three representative β coefficients of 1, 50 and 1000. 
+At β = 1, the samples are the most diverse, but are frequently inconsistent with the observation pixels. For example, the adapter produces an image of a car, when the true observation is of a frog. 
+At β = 1000, the samples lock on to the observed pixels more consistently, however the samples have less variation among them. This is most clear in the frog example, where all samples are near-identical. 
+At β = 50, we see the best balance between diversity and fidelity to the observation. 
 
 \begin{figure}[p]
 \centering
@@ -2009,10 +2042,49 @@ restored in most but not all samples).}
 \label{fig:inp_beta_ablation}
 \end{figure}
 
+The per-sample fideliy metrics (PSNR, SSIM and LPIPS) from Table~\ref{tab:inp_beta} confirm that incresing $\beta$ improves the fidelity of produced samples to the observation. However, this improvement is fairly minimal and saturates after around $\beta=100$. 
+The CRPS metric also confirms that increasing $\beta$ reduces the diversity of the produced samples, with CRPS worsening at almost every increase in $\beta$. 
+Both FID and MMD are relatively stable across $\beta$ values, with the exception of $\beta=1000$, for which FID significantly degrades.  
+Given that improvement in the fidelity metrics saturate after $\beta=100$, and diversity is not significantly worsened at this $\beta$, we choose $\beta=100$ to train the noise adapter in the final evaluation against all baselines. In the final evaluation, we train the adapter with an increased budget of 12k steps. 
 
 
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{l ccccccc}
+\toprule
+$\beta$ & Residual $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ \\
+\midrule
+1    & 9.46 & 19.72 & 0.559 & 0.065 & \textbf{14.17} & 0.074 & \textbf{8.60} \\
+10   & 8.81 & 20.22 & 0.581 & 0.063 & 14.79 & 0.077 & 8.71 \\
+20   & 8.70 & 20.33 & 0.583 & 0.063 & 15.47 & 0.077 & 8.76 \\
+50   & 8.56 & \textbf{20.44} & 0.589 & 0.063 & 15.60 & 0.076 & 8.99 \\
+100  & 8.47 & 20.41 & 0.592 & 0.062 & 15.11 & \textbf{0.073} & 8.98 \\
+200  & 8.44 & 20.40 & \textbf{0.592} & \textbf{0.061} & 15.43 & 0.074 & 9.23 \\
+500  & \textbf{8.35} & 20.33 & 0.590 & 0.062 & 15.96 & 0.076 & 9.35 \\
+1000 & 8.47 & 20.27 & 0.580 & 0.065 & 17.32 & 0.079 & 9.50 \\
+\bottomrule
+\end{tabular}
+\caption{$\beta$-ablation on inpainting. All adapters use the same recipe and are
+trained for 6{,}000 steps, differing only in $\beta$; evaluated on the 9{,}000
+held-out test images under the protocol of Table~\ref{tab:sr_ablation}. Best per
+column in bold.}
+\label{tab:inp_beta}
+\end{table}
 
 \subsubsection{Comparison with Baselines}
+We evaluate the same guidance baselines from the previous section, all using the same  1-Rectified Flow. 
+We again perform a per-method hyperparameter search for each guidance baseline, specifically for the inpainting setting, rather than reusing the optimal hyperparameters for super-resolution.   
+For the VFM baseline, we again train a Gaussian adapter jointly with the flow map using AdamW with learning rate $10^{-4}$ for both networks, batch size 64), but now for 20{,}000 steps.
+Unlike super-resolution, where training for longer degraded sample quality, we did not find this to be the case for inpainting. 
+
+The reported metrics in Table~\ref{tab:inp_baselines} shows that unlike in the super-resolution task, our method does not remain competitive for inpainting. While much faster than the guidance baselines, our method is either last or second-to-last on every metric. 
+On the other hand, DPS and VFM are the best and second-best respectively for most metrics. 
+We see that the measurement residual for our method is drastically worse than the baseline methods. This highlights that our method fails to produce samples whose pixels match those of the observation.  
+Guidance methods do not struggle in the same way because they apply a correction towards the observation at each one of their 100-500 integration steps. 
+Additionally, as we saw in the checkerboard experiments, VFM fine-tunes the flow map so that the noise space geometry is simple enough so that the adapter can easily determine which region of the noise space decodes to samples which are consistent with the observation.  
+Our noise adapter, on the other hand, must learn to find the correct region of the noise space without being able to correct the noise along the sampling trajectory (as in guidance methods), and it must do so without fine-tuning the flow map (as in VFM). 
+This is clearly a harder task to learn, and we further investigate why the normalising flow adapter fails at this task in the following section. 
 
 \begin{figure}[t]
 \centering
@@ -2032,6 +2104,33 @@ VFM jointly trains a Gaussian adapter with the flow map; the NF adapter samples
 through the frozen flow map in a single step.}
 \label{fig:inp_baselines_qualitative}
 \end{figure}
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l c ccccccc c}
+\toprule
+Method & NFE & Residual $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ & Time (s) $\downarrow$ \\
+\midrule
+DPS       & 200 & 2.54 & \textbf{24.44} & \textbf{0.859} & \textbf{0.022} & \textbf{6.82} & 0.049 & \textbf{6.02} & 0.248 \\
+DAPS      & 500 & 3.36 & 22.12 & 0.782 & 0.033 & 12.50 & 0.076 & 6.90 & 0.655 \\
+MPGD      & 100 & 2.56 & 20.50 & 0.780 & 0.045 & 9.27  & 0.045 & 6.82 & 0.114 \\
+FlowChef  & 100 & 2.58 & 21.30 & 0.797 & 0.037 & 8.58  & 0.051 & 6.46 & 0.114 \\
+FlowDPS   & 100 & \textbf{2.49} & 24.13 & 0.842 & 0.029 & 10.71 & 0.058 & 6.72 & 0.115 \\
+\midrule
+VFM       & 1 & 3.50 & 23.05 & 0.776 & 0.027 & 7.84 & \textbf{0.041} & 6.64 & \textbf{0.001} \\
+NF (ours) & 1 & 9.41 & 19.69 & 0.564 & 0.065 & 11.61 & 0.062 & 8.46 & 0.004 \\
+\bottomrule
+\end{tabular}
+\caption{Comparison with training-free guidance baselines and VFM on inpainting
+(central $12\times12$ hole), evaluated on the same 9{,}000 held-out test images
+and metrics as Table~\ref{tab:sr_baselines}. Guidance baselines use their
+per-method best hyperparameters and run on the 1-Rectified Flow prior; the NF
+adapter is the 12{,}000-step $\beta = 500$ model. Best in bold.}
+\label{tab:inp_baselines}
+\end{table}
+
 
 
 \chapter{Conclusion}                                
