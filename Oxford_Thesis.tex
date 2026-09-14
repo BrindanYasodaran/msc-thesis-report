@@ -1420,7 +1420,7 @@ For each set, FID computes the mean vector and covariance matrix.
 FID then computes the Frechet distance (also called the 2-Wasserstein distance) between the two Gaussians.
 FID is zero when the two Gaussians coincide, and larger as they differ.
 
-We use a sample size of 50k for each set, in order to evaluate FID. Additionally, because Inception-v3 expects 299x299 inputs with input pixel range of [0, 255], we upsample our images which are 32x32, and scale our pixel values to this range. 
+Because Inception-v3 expects 299x299 inputs with input pixel range of [0, 255], we upsample our images which are 32x32, and scale our pixel values to this range. 
 
 \textbf{MMD)}
 We compute MMD, using the exact sample umbiased estimator~\ref{eq:MMD} we previously saw, but now between the same two sets for which FID is evaluated on. 
@@ -1622,8 +1622,8 @@ There is no official validation split, but we set aside a fixed, randomly select
 \subsection{Common Setup}
 \subsubsection{Base Flow Map}
 Our method requires a base flow map which can generate samples from the unconditional data distribution, p_data(x).
-We use the released weights of the flow map released by the authors of MeanFlow (Geng et al., 2025).
-The authors train an unconditional flow map (no class labels)using the MeanFlow algorithm on the CIFAR-10 training set. 
+We use the weights of the flow map released by the authors of MeanFlow (Geng et al., 2025).
+The authors train an unconditional flow map (no class labels) using the MeanFlow algorithm on the CIFAR-10 training set. 
 They use a U-Net (Song et al.) with 55.9M parameters, operating directly in pixel space rather than in latent space. 
 We note that in their imagenet experiments, VFM use trains a class-conditioned flow map which operates in a latent space of a pretrained autoencoder, rather than directly in pixel space.
 
@@ -1643,6 +1643,7 @@ Within each transformer layer, each attention layer uses 4 heads of dimension 64
 and mixed by an output projection $\text{Linear}(256 \to 256)$. 
 Each MLP uses an expansion factor of 4, i.e.\ $\text{Linear}(256 \to 1024) \to \text{GELU} \to \text{Linear}(1024 \to 256)$. 
 The unconditional adapter has 6.53M parameters.
+While we did not have the compute for a hyperparameter search, we experimented with various different hyperparameters and NF architectrues beyond TarFlow and found that these hyperparameters worked well across all the inverse problem settings we tried. 
 
 The main difference across different inverse problem settings is the dimension of the observation y, which determines how we give the observation as input to the TarFlow adapter.
 We describe how we condition the TarFlow adapter on the observation y separately for each inverse problem setting in their respective sections.
@@ -1651,7 +1652,7 @@ All training uses the Adam optimiser with gradient-norm clipping at 5.0.
 All experiments run in PyTorch~2.13 (CUDA~13.0) on a single RTX~A5000. 
 
 \subsection{Brightness Steering}
-Before progressively increasing the difficulty of the inverse problems we consider, we first consider a simple inverse problem where the observation y is a single scalar value corresponding to the mean brightness of the image.
+Before considering more difficult inverse problems with higher dimensional observations, we first consider a simple inverse problem where the observation y is a single scalar value corresponding to the mean brightness of the image.
 In particular, we define the forward problem as follows. 
 Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 → R is the mean over all 3·32·32 pixel values, with each pixel in [-1, 1],  ε ~ N(0, σ²), σ = 0.05. 
 We choose σ to be small enough so that samples from p(x | y) are visibly different from p(x), but large enough so that it is copmutationally feasible to obtain samples from p_data(x | y) via rejection sampling (we measured around 9\% acceptance). 
@@ -1665,12 +1666,12 @@ We only consider a single fixed observation y* because we want to isolate the fa
 \centering
 \begin{subfigure}{0.9\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{brightness_panels/block_uncond}
+  \includegraphics[width=\linewidth]{brightness_panels/block_uncond.png}
   \caption{Unconditional, $p_\theta(\mathbf{x})$}
 \end{subfigure}\\[8pt]
 \begin{subfigure}{0.9\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{brightness_panels/block_posterior}
+  \includegraphics[width=\linewidth]{brightness_panels/block_posterior.png}
   \caption{Posterior, $p_\theta(\mathbf{x} \mid y^{*})$}
 \end{subfigure}
 \caption{Samples from (a) the unconditional flow map and (b) the posterior
@@ -1680,54 +1681,54 @@ $y^{*} = 0.2$. Conditioning visibly brightens the samples.}
 \end{figure}
 
 \subsubsection{Adapter Training}
-We compare a diagonal Gaussian adapter and a Normalising Flow adapter, both keeping the flow map frozen.
+We compare a diagonal Gaussian adapter and a Normalising Flow adapter, keeping the flow map frozen in both cases.
 As we are no longer amortising over the observation y, for the diagnoal Gaussian adapter, we directly optimise its mean and variance parameters, both R^3072.
 While it is possible to use full covariance Gaussian, it would be computationaly infesible when moving to the amortised setting. 
 In particular, for D=3072, the covariance matrix would have 4.72M entries.
 An output layer that maps an e.g. 512 dimension feature vector to 4.72M values, would require 2.4 billion parameters. 
 
 We train the Gaussian and Normalising Flow adapters using the reverse KL objective. 
-Futhermore, we additionally train a separate Gaussian adapter using the forward KL objective in order to show that the failure of the Gaussian adapter is due to the lack of expressivity of the Gaussian distribution, rather than the mode seeking nature of the reverse KL objective.
+Futhermore, we additionally train a separate Gaussian adapter using the forward KL objective in order to show that the failure of the Gaussian adapter is due to the lack of expressivity of the Gaussian distribution, rather than due to the mode seeking nature of the reverse KL objective.
 Training via forward KL requires samples from p_theta(z | y*), which we obtain by rejection sampling from the frozen flow map.
 We collect 50,000 such samples for training. 
 For a diagonal Gaussian, minimising fKL (or equivalently, maximising the likelihood) can be performed in closed form rather than by gradient descent. 
 
-When using the reverse KL objective, we oprimise the mean and variance parameters of the Gaussian using Adam (learning rate 2x10⁻⁴, cosine decay to 10⁻⁵), batch size 128, for 6,000 steps. Before training, we initialise the mean and variance to be the prior, i.e. μ = 0, sigma=1. 
-We also optimise the normalising flow parameters with Adam for 6{,}000 steps at bath size 64, with a learning rate of $2\times10^{-4}$ decayed to $10^{-5}$ by a cosine schedule.
+When using the reverse KL objective, we optimise the mean and variance parameters of the Gaussian using Adam (learning rate 2x10⁻⁴, cosine decay to 10⁻⁵), batch size 128, for 6,000 steps. Before training, we initialise the mean and variance to be the prior, i.e. μ = 0, sigma=1. 
+We also optimise the normalising flow parameters with Adam for 6000 steps at bath size 64, with a learning rate of $2\times10^{-4}$ decayed to $10^{-5}$ by a cosine schedule.
 
 \subsubsection{Results}
 To visualise the performance of each method, Figure~\ref{fig:brightness_adapters} shows samples produced by decoding noise samples from each trained noise adapter via the frozen flow map. 
 Comparing to samples from Figure~\ref{fig:brightness_prior_posterior}b, we see that the NF adapter and even the Gaussian adapter trained with forward KL produces samples which visually match samples from p_theta(x | y). 
-On the other hand, the Gaussian adapter trained with reverse KL produces images which are predominantly characterised by the top hald of the image being white, and the bottom half being darker. This indicates that the Gaussian adapter has learned to produce samples from one mode of p_theta(z | y*) rather than the full distribution, which is as expected when training with reverse KL.
+On the other hand, the Gaussian adapter trained with reverse KL produces images which are predominantly characterised by the top half of the image being white, and the bottom half being darker. This indicates that the Gaussian adapter has learned to produce samples from one mode of p_theta(z | y*) rather than the full distribution, which is as expected when training with reverse KL.
 
 We also provide a quantitative evaluation of each method. Because we do not amortise over the observation y, we do cannot follow the evaluation framework of Section~\ref{sec:eval_framework}. In particular, as outlined in the framework, the PSNR, SSIM and LPIPS metrics evaluare the similarity of a single sample produced by the inverse problem solving method to a single sample from the true posterior p_data(x | y*), and average over the observation y. Hence, these metrics are not applicable in this setting, where we have a single fixed observation y*.
 
-Instead, for each method we produce 50,000 samples from the trained noise adapter and decode them via the frozen flow map and compare against 50,000 samples from the posterior p_theta(x | y*) obtained by rejection sampling.
+Instead, for each method we produce 50,000 samples from the trained noise adapter and decode them via the frozen flow map and compare against 50,000 samples from the posterior p_theta(x | y*) obtained by rejection sampling. We choose p_theta(x | y*) rather than p_data(x | y*) to allow us to obtain a set of 50,000 samples. 
 For each method, we compute the similarity of its produced samples and the true posterior samples using various metrics as shown in table~\ref{tab:brightness_steering}.
 
-We see that the mean and standard deviation of the brightness values of the samples produced by the NF adapter is 0.184 and 0.064 respectively, which is very close to the mean and standard deviation of the true posterior samples, which are 0.1887 and 0.0498 respectively. 
+We see that the mean and standard deviation of the brightness values of the samples produced by the NF adapter is 0.184 and 0.064 respectively, which is very close to the mean and standard deviation of the true posterior samples, which we computed to be 0.1887 and 0.0498 respectively. 
 On the other hand, the brightness standard deviation of both Gaussian adapters are significantly higher than the true posterior, indicating that they have failed to capture the spread of brightness values of the true posterior.
 To further quantify this, we compute the Wasserstein-1 distance between the brightness values of the samples produced by each method and the true posterior samples. 
 Finally, we compute FID and MMD between both sets of samples, using the same Inception-v3 feature space as in Section~\ref{sec:eval_framework}.
 We see that the Gaussian adapter trained with reverse KL has especially poor FID and MMD, which is consistent with the visualisation of its samples in Figure~\ref{fig:brightness_adapters}. 
-We note that the NF adapter has an FID of 0.98, which is lower than the FID of 2.81 of the unconditional flow map to the cifar10 train set. 
+We note that the NF adapter has an FID of 0.98, which is lower than the FID of 2.81 of the unconditional flow map samples p_theta(x) to the cifar10 train set p_data(x). 
 This unusually low FID is because we are comparing with p_theta(x | y*) rather than p_data(x|y*).
 
 \begin{figure}[t]
 \centering
 \begin{subfigure}{0.9\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{brightness_panels/block_gauss_rkl}
+  \includegraphics[width=\linewidth]{brightness_panels/block_gauss_rkl.png}
   \caption{Gaussian (rKL)}
 \end{subfigure}\\[8pt]
 \begin{subfigure}{0.9\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{brightness_panels/block_gauss_fkl}
+  \includegraphics[width=\linewidth]{brightness_panels/block_gauss_fkl.png}
   \caption{Gaussian (fKL)}
 \end{subfigure}\\[8pt]
 \begin{subfigure}{0.9\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{brightness_panels/block_nf_rkl}
+  \includegraphics[width=\linewidth]{brightness_panels/block_nf_rkl.png}
   \caption{NF (rKL)}
 \end{subfigure}
 \caption{Samples from each noise adapter for $y^{*} = 0.2$. The rKL Gaussian
@@ -1761,52 +1762,277 @@ against oracle posterior samples in Inception feature space. Best in bold.}
 \end{table}
 
 \subsection{Super-Resolution}
-The forward problem: y = Ax + e. 
-x is [-1,1]^{3x32x32}
-Here, A represents bicubic downsampling. 32x32x3 -> 8x8x3. %give more details here
-We choose e to be Gaussian with mean 0 and sigma=0.05 .
-validation set is 1000 real CIFAR-10 test images
+We now test the efficacy of our method a 4x super-resolution inverse problem setting. 
+In particular, we define the forward problem as follows, 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 -> R^192 downsamples x by a factor of 4 (from 32×32×3 to 8×8×3),  e ~ N(0, σ²I) and σ = 0.05. 
+We choose σ = 0.05 as this matches the standard in inverse problem solving literature. 
+Following the protocol of VFM, we use bicubic downsampling with antialiasing, so that each pixel in Ax is a weighted average of a local neighbourhood of pixels in x. 
+
+Unlike in the brightness inverse problem, we now amortise over observations. More precisely, we train noise adapters which are conditioned on the observation y.  
+Futhermore, it is no longer computaitonally feasible to obtain samples from p_theta(x | y) via rejection sampling in this super-resolution setting because the acceptance probability for a 192-dimensional observation is too small. 
+Hence we cannot evaluate the samples produced by our method directly against p_theta(x | y), and we use the evaluation framework outlined in the method section. 
+Finally, because the checkerboard and brightness experiments have established that a Gaussian adapter with frozen $theta$ is insuffient, we only evaluate NF adapters with frozen $theta$ moving forward. 
 
 \subsubsection{Noise Adapter Training details}
 \textbf{Conditioning mechanism}
-How do we inject information about y into the TarFlow adapter?
-We first process the observation y using a CNN. 
-CNN consists of three 3x3 convolutions: Conv(3→64) → SiLU → Conv(64→64) → SiLU → Conv(64→64) 
-The spatial resolution remains 8x8 after each convolution
-So that the output has dimension (64, 8, 8)
-We now have a 64-dimensional feature vector for each of the 8^2=64 spatial positions/pixels in the observation y. 
-Recall that TarFlow splits z into a grid of 4x4 patches, so that we have 8^2 patches/ tokens of z, corresponding to a spatial region within the image. 
-There is hence a one-to-one spatial correspondence between each of the 64 feature vectors of the observation, and the tokens processed by tarflow
+Now that we amortise over observations, we discuss how we give the observation as input to the TarFlow noise adapter. 
+Givem an observation y in 3x8x8, we first process it using a CNN with three 3x3 convolutional layers with SiLU activation function, to produce a 64x8x8 output (i.e. 64 feature maps, with resolution kept at 8x8). 
+Hence, for each of the 8^2=64 observation pixels, we have a 64-dimensional feature vector. 
+Since TarFlow's 4x4 patching gives exactly 8² = 64 tokens, there is a one-to-one spatial correspondence between observation feature vectors and flow tokens. 
 
-For each of the NB=4 blocks, we inject the observation feature vectors into the normalising flow. 
-For each block, we have a separate learned linear layer Linear(64 → 256), which maps the 64 observation feature vectors to the internal dimension of the conditioner neural network. 
-For each token embedding, immediately after proj_in + positional embedding, we add the projected observation feature vector corresponding to the same spatial position. 
-Importantly, we make sure to permute the observation embeddings to align with the permutation of the token embeddings. 
+For each of the NB=4 blocks of TarFlow, a separate learned Linear(64→256) projects the observation feature vectors to the token dimension. 
+The projected feature vector is added to the spatially-matching token embedding immediately after proj_in + positional embedding. 
+Importantly, we make sure to appropriately permute the observation embeddings to align with the spatially-matching token embeddings. 
 
-Conditioner ≈ 0.14M parameters; whole model 6.67M.
+The embedding CNN has 0.14M parameters, and so the conditional adapter has 6.67M in total. We purposefully use a very light low-prameter embedding CNN as we did not find that, for super-resolution, more parameters significantly influenced results. 
 
-\subsubsection{rKL vs fKL vs Mixed Objective Ablation}
-All use cosine schedule 5e-4 → 1e-5 for LR. 
-differ in number of steps: fkl 12k, mix 12k, rkl 6k
-fkl batch 128
-mix: batch 128 (fkl) + 32 (rkl term, first 32 of the same y batch)
-rkl: 32 x 2 accumulation (eff. 64)
-wall clock is 80 min fkl, 210 min mix, 279 min rkl. 
+\subsubsection{Objective Ablation}
+In the method section, we discussed that the NF adapter could be trained using either a mode-seeking reverse kl or mode-covering forward kl objective. To overcome the limitations of either objective, we propose using an objective which combines both. 
+We now determine whether this hypothesis holds true empirically in our super-resolution setting.  
+In particular, we train three separate TarFlow noise adapters using all three objectives, keeping all other hyperparameters fixed for fair comparison. 
 
-weigtt ramp for mix is piecewise constant: 5.5e-4, 2e-3, 7.2e-3, 1.3e-2
-0 until step 6k, then weight ramp applied at steps 6000 / 7000 / 8500 / 10000
+\textbf{Training details}
+All adapters are trained using the Adam optimiser, with learning rate of 5×10⁻⁴, decayed to 10⁻⁵ according to a cosine schedule. 
+We use a batch size of 128 for 12,000 steps for the forward kl objective, and a batch size of 64 for 6,000 steps for reverse kl. 
+Because, of the MAF orientation of the TarFlow adapter, reverse kl training uses a smaller batch size and number of training steps to reamin copmutationally feasible. 
+Mixed objective training uses a batch size of 128 for the forward kl term, and 32 (from the same generated batch) for the reverse kl term, and trains over 12k steps. 
+We calibrate the weight schedule of the reverse kl term as outlined in the method section, giving giving w = 5.7×10⁻⁴ / 1.9×10⁻³ / 7.2×10⁻³ / 1.3×10⁻² at at steps 6000/7000/8500/10000.   
+Training time is 279, 80, 210 minutes respectively for reverse kl, forward kl, and the mixed objective respectivelu. 
 
-for weight ramp:
-during training, we found that the realised share stayed within roughly within roughly ±10 points of target throughout the ramp (6.5\% at the start; 44-59\% over the final stage),
+For each adapter, we measure performance on the 1k validation set. 
+In particular, for each of the 1k validation samples, we decode 10 adapter samples via the flow map, and compute both measurement residual and pixel-space CRPS. 
+Measurement residual quantifies how faithful the samples are to the input observation, while pixel-space CRPS also quantifies the diversity within the 10 samples produced for a given observation.  
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{sr_ablation_panels/sr_ablation_residual}
+  \caption{Measurement residual}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{sr_ablation_panels/sr_ablation_crps}
+  \caption{Pixel-space CRPS}
+\end{subfigure}
+\caption{Validation metrics during training for the three objectives on
+$4\times$ super-resolution. Every 1{,}000 steps we draw 10 samples per
+observation on the fixed 1{,}000-image validation set and report (a) the
+measurement residual $\|A\hat{\mathbf{x}} - \mathbf{y}\|_2$, averaged over
+samples and observations, and (b) the pixel-space CRPS of Eq.~\ref{eq:CRPS}.
+The rKL arm trains for 6{,}000 steps; fKL and mixed train for 12{,}000. The
+mixed arm coincides with fKL over its first 6{,}000 steps (pure fKL stage) and
+improves on both metrics once the rKL term is ramped in.}
+\label{fig:sr_ablation_curves}
+\end{figure}
+
+Figure~\ref{fig:sr_ablation_curves} shows that measurement residual descends most when training via only reverse kl. This is to be expected since the reverse kl objective directly penalises the measurement residual |Ax - y|. 
+However, CRPS remains higher when training with reverse kl as compared to forward kl, which indicates that samples have poor diversity. 
+Notably, training with a mixed objective results in both a low residual and CRPS by training step 12,000, confirming our hypothesis. 
+
+\begin{figure}[p]
+\centering
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{sr_ablation_panels/a_s779_00.png}
+%   \caption{Generated target (dog)}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{sr_ablation_panels/b_test190.png}
+%   \caption{Real test image (dog)}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{sr_ablation_panels/c_test421.png}
+%   \caption{Real test image (dog)}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{sr_ablation_panels/d_s778_49.png}
+%   \caption{Generated target (bird)}
+\end{subfigure}
+\caption{Qualitative comparison of the three training objectives on
+$4\times$ super-resolution. In each panel, the left column shows the ground
+truth $\mathbf{x}_{\text{true}}$ (top) and the observation $\mathbf{y}$
+(bottom, nearest-neighbour upsampled); the three rows to the right show eight
+posterior samples from the adapter trained with, top to bottom, rKL, fKL, and
+the mixed objective.}
+\label{fig:sr_ablation_qualitative}
+\end{figure}
+
+We further validate our hypothesis by inspecting samples produced by the adapters trained using each objective. 
+Figure~\ref{fig:sr_ablation_qualitative}, shows 4 separate ground-truth images and corresponding observations (seen on the left hand column), and samples produced via the adapters trained using the three different objectives. 
+Top samples are from the rKL-trained adapter, middle from fKL-trained adapter and bottom from the adapter trained using the mixed objective. 
+
+We see that, on the whole, the rKL adapter produces samples which are consistent with the observation but are blurry. The fKL adapter produces sharp and diverse samples, but often deviate from the measurement, while the adapter trained with the mixed objective offers a balance between both trade-offs. 
+We note that, for each adapter, the generated samples do not match the object class of the true sample. 
+We attribute this to the fact that we do not use a class-conditioned flow map (nor do we class-condition our noise adapter). 
+Hence givem a downsampled observation with no class information, it is genuinely ambiguous which class of object the observation comes from. 
+In other words, p_data(x | y) for a given observation y geneuniely represents a distribution over many classes. 
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{l cccccc}
+\toprule
+Objective & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ \\
+\midrule
+rKL   & 18.28 & 0.365 & 0.089 & 26.05 & 0.112 & 9.65 \\
+fKL   & 17.06 & 0.347 & 0.076 & \textbf{7.90} & \textbf{0.031} & \textbf{8.53} \\
+Mixed & \textbf{18.58} & \textbf{0.404} & \textbf{0.070} & 11.14 & 0.051 & 8.67 \\
+\bottomrule
+\end{tabular}
+\caption{Objective ablation on $4\times$ super-resolution, evaluated on the
+9{,}000 held-out test images (one sample per observation for PSNR, SSIM, LPIPS,
+FID and MMD; feature-space CRPS uses $N{=}10$ samples on a fixed subset of 128
+observations). FID and MMD compare the generated set against the corresponding
+ground-truth images in Inception feature space. Best in bold.}
+\label{tab:sr_ablation}
+\end{table}
+
+Finally, using the 9k test samples, we evaluate the metrics outlined in the evaluation framework, for each of the three adapters. 
+Table~\ref{tab:sr_ablation} shows that adapter trained via a mixed objective wins on every per-sample fidelity metric (PSNR, SSIM, LPIPS), while the fkl-trained adapter wins on every distributional metric (FID, MMD, CRPS). 
+Hence adding the reverse kl loss to the forward kl objective results in improved fidelity to the true sample which produced the observation, but the worse FID and MMD indicate that it results in samples which deviate from true cifar10 samples x ~ p_data(x). This is consistent with the figrues which show that the samples produced by the fkl-trained adapter are sharper. Theoretically, this is also to be expected since the maximum likelihood objective directly encourages the approximate distirbution q, to place mass at noise obtained by sampling from N(0, I) directly. 
+
+Moving forward, all adapters we train use the mixed objective because it offers the best balance between observation fidelity and diversity. 
 
 \subsubsection{Comparison with Baselines}
+We now evaluate our normalising flow adapter trained with the mixed objective against several guidance-based baselines and VFM which jointly trains the flow map with a Gaussian noise adapter. 
+
+Recall from Related Work section that guidance methods steer the trajectory of the ODE defined by the mariginal unconditional vector field, and so requires a flow model which can output instantaneous velocities, $v(x_t, t)$ along trajectories. 
+Since our flow map can produce instantaneous velocities (i.e. V(x_t, t, t) = v(x_t, t)), we can use the same network which paramerises our flow map to unroll trajectories using Euler's method in principle. However, in practice, when producing samples in this way, using 100 integration steps, we obtain an FID of 4.48 compared to 2.81 for the one-step decode. 
+Therefore, running the guidance baselines by using the flow map as a flow model would not provide a fair comparison. We instead run the guidance baselines with the 1-Rectified Flow model of
+\citet{liu2023flow}, whose FID we evaluate as $2.77$ using the RK45 adaptive solver which used 124 integration steps on average. 
+
+All guidance baselines we evaluate aside from DAPS all guide trajectories by nudging the trajectory by the gradient of an estimate of the value function - see related work for more detail. 
+To ensure a rigorous comparison, each baseline method's hyperparameters are selected by a hyperparameter search on the fixed 1k sample validation set. 
+We consider the number of Euler integration steps performed by each method as a hyperparameter, and subsequently report the number of function evaluations (NFE) used by each method in Table~\ref{tab:sr_baselines}. 
+
+For comparison, we jointly train a Gaussian adapter with the flow map, using VFM's training objective. We use AdamW with learning rate $10^{-4}$ for both networks and batch size 64. We tried training for various number of steps, ultimately choosing to train for 2000 total steps as training for longer degraded the ability of the flow map to act as an unconditional generator. 
+
+For evaluation, we provide samples from each method in Figure~\ref{fig:sr_baselines_qualitative} and evaluate each method using the 9k test samples via the evaluation framework in the method section. 
+Table~\ref{tab:sr_baselines} shows that no method dominates for this super-resolution task. 
+We see that FlowDPS performs best on PSNR and SSIM, however Figure~\ref{fig:sr_baselines_qualitative} , shows that FlowDPS produces the blurriest samples. Given that PSNR and SSIM rewards samples at the mean of p_data(x | y), this is expected. 
+
+
+\begin{figure}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{1.5pt}
+\renewcommand{\bimg}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{sr_baseline_panels/col_#1.png}}}
+\begin{tabular}{ccccccccc}
+Truth & Measurement & DPS & DAPS & MPGD & FlowChef & FlowDPS & VFM & NF (ours) \\
+\bimg{gt} & \bimg{meas} & \bimg{dps} & \bimg{daps} &
+\bimg{mpgd} & \bimg{flowchef} & \bimg{flowdps} & \bimg{vfm} & \bimg{nf} \\
+\end{tabular}
+\caption{Qualitative comparison with training-free guidance baselines on
+$4\times$ super-resolution. Each row is one observation; for every method we
+show the best of ten samples. The guidance baselines run on a 1-Rectified-Flow
+prior of matched quality to our frozen flow map (FID $2.77$ vs $2.81$), since
+trajectory guidance requires an instantaneous-velocity ODE, and each baseline
+uses its best hyperparameters from a per-method tuning sweep. Our NF adapter
+samples through the frozen flow map in a single step. VFM jointly trains a Gaussian adapter and
+fine-tunes the flow map (checkpoint selected at step 2{,}000)...}
+\label{fig:sr_baselines_qualitative}
+\end{figure}
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l c cccccc c}
+\toprule
+Method & NFE & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ & Time (s) $\downarrow$ \\
+\midrule
+DPS       & 500 & 19.67 & 0.468 & 0.049 & 12.68 & 0.082 & 8.47 & 0.623 \\
+DAPS      & 500 & 18.37 & 0.368 & 0.061 & 28.96 & 0.135 & 9.08 & 0.643 \\
+MPGD      & 100 & 18.94 & 0.416 & 0.053 & 17.44 & 0.100 & 8.77 & 0.115 \\
+FlowChef  & 100 & 18.85 & 0.433 & 0.049 & \textbf{10.87} & 0.067 & \textbf{8.31} & 0.140 \\
+FlowDPS   & 28  & \textbf{20.56} & \textbf{0.515} & 0.083 & 53.82 & 0.206 & 9.96 & 0.032 \\
+\midrule
+VFM       & 1 & 19.40 & 0.452 & \textbf{0.046} & 18.50 & 0.092 & 9.30 & 0.003 \\
+NF (ours) & 1 & 18.58 & 0.404 & 0.070 & 11.14 & \textbf{0.051} & 8.67 & \textbf{0.002} \\
+\bottomrule
+\end{tabular}
+\caption{Comparison with training-free guidance baselines and VFM on $4\times$
+super-resolution, evaluated on the 9{,}000 held-out test images under the
+protocol of Table~\ref{tab:sr_ablation}. Guidance baselines run on a
+1-Rectified-Flow prior of matched quality to our frozen flow map (FID $2.77$ vs
+$2.81$), each at the step count and guidance scale selected by its own
+hyperparameter sweep; the NFE column reports the resulting network evaluations
+per sample. VFM jointly trains a Gaussian adapter with the flow map (checkpoint
+at step 2{,}000); the NF adapter is the mixed-objective TarFlow on the frozen
+map. Time is sampling wall-clock per image at the evaluation batch size on an
+RTX A5000. Best in bold.}
+\label{tab:sr_baselines}
+\end{table}
+
+
+
+
 
 \subsection{Inpainting}
 \subsubsection{Noise Adapter Training details}
 \textbf{Conditioning mechanism}
-\subsubsection{Conditioning mechanism Ablation}
 \subsubsection{$\beta$-VAE Ablation}
+
+\begin{figure}[p]
+\centering
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{inp_beta_panels/a_frog.png}
+  \caption{Generated target (frog)}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{inp_beta_panels/b_truck.png}
+  \caption{Generated target (truck)}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{inp_beta_panels/c_horse.png}
+  \caption{Generated target (horse and rider)}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.92\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{inp_beta_panels/d_biplane.png}
+  \caption{Generated target (biplane)}
+\end{subfigure}
+\caption{$\beta$-ablation on inpainting. In each panel, the left column shows
+the ground truth (top) and the observation with the central $12\times12$ hole
+(bottom); the three rows show eight samples from adapters trained with, top to
+bottom, $\beta = 1$, $50$ and $1000$. Small $\beta$ produces diverse but
+occasionally context-inconsistent completions (a car in the frog scene, dogs in
+place of the biplane); large $\beta$ locks tightly onto the context at reduced
+diversity; intermediate $\beta$ trades between the two (e.g.\ the rider is
+restored in most but not all samples).}
+\label{fig:inp_beta_ablation}
+\end{figure}
+
+
+
+
 \subsubsection{Comparison with Baselines}
+
+\begin{figure}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{1.5pt}
+\newcommand{\bimginp}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{inp_baseline_panels/col_#1.png}}}
+\begin{tabular}{ccccccccc}
+Truth & Measurement & DPS & DAPS & MPGD & FlowChef & FlowDPS & VFM & NF (ours) \\
+\bimginp{gt} & \bimginp{meas} & \bimginp{dps} & \bimginp{daps} &
+\bimginp{mpgd} & \bimginp{flowchef} & \bimginp{flowdps} & \bimginp{vfm} & \bimginp{nf} \\
+\end{tabular}
+\caption{Qualitative comparison with training-free guidance baselines and VFM on
+inpainting (central $12\times12$ hole). Each row is one observation; for every
+method we show the best of ten samples. Guidance baselines run on the
+matched-quality 1-Rectified-Flow prior at their per-method best hyperparameters;
+VFM jointly trains a Gaussian adapter with the flow map; the NF adapter samples
+through the frozen flow map in a single step.}
+\label{fig:inp_baselines_qualitative}
+\end{figure}
+
 
 \chapter{Conclusion}                                
 \section{Summary}
