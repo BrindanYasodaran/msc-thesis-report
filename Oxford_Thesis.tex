@@ -227,35 +227,122 @@ Finally, family.
 
 \chapter{Introduction}                 
 \section{Motivation}
-Diffusion models are a predominant method for generative modelling. How do they work? Explain why they are limited by requiring several forward passes at inference time. 
+Diffusion and flow models have seen large success in generative modelling across various modalities including image, video and audio.
 
-Flow maps overcome this limitation. Explain how they work. 
+Such models model a complex data distribution as a transformation of a simple noise distribution. 
 
-Often we want to do conditional generation. For example, given a prompt, or class, generate an image. 
-Inverse problem solving is a canonical example. Explain it. 
+The defining characteristic of flow and diffusion models is that they model the transformation between the noise and data distributions as a continuous-time transformation whose dynamics are governed by an ODE and SDE respectively. 
 
-Using a flow model, several methods achieve conditional generating by nudging the sampling trajectory at each step. 
-Importantly, such methods can be designed to simply use a pre-trained uncodontional flow model and do not require any fine-tuning. 
+In the case of flow models, the vector field which defines the ODE is parameterised by a neural network. 
 
-When doing one-step generation with flow maps, we jump from noise to data directly, so these training-free guidance-based methods cannot be used to enable conditional generation with pre-trained unconditional flow maps.  
-To achieve conditional generation with flow maps, several methods therefore fine-tune or train flow map from scratch to solve the conditional generation task. 
+Generating data proceeds by sampling from the noise distribution and repeatedly taking small steps in the direction of the vector field. 
 
-One such method which fine-tunes the flow map is Variational Flow maps. 
-Rather than guiding the trajectory from noise to data, they frame conditional generation as finding the right starting noise which maps to data satisying the condition. 
-In particular, they learn a noise adapter which given a condition predict the right starting noise. 
-They use a noise adapter which models the starting noise distirbution as a simple gaussian. 
-Because a gaussian is very simple, they hence jointly train the noise adapter with the flow map. 
-Our project hypothesises that by making the noise adapter more expressive, we can find the right noise without fine-tuning the noise adapter. 
+Therefore, while flow models enable high-fidelity generation, they often require a large number of neural network evaluations resulting in high computational cost. 
 
-While methods such as GFT or VFM enable one-step conditional generation, such methods require fine-tuning or training a flow map from scratch rather than being methods which are compatible with a pre-trained unconditional flow map. 
-Furthermore, while methods exist for conditional generation with flow or diffusion models, which are compatible with pre-trained unconditional flow models, these methods are all very slow because they require many forward passes of a denoising neural network. 
-Our project allows for both one-step generation and does not require any fine-tuning of the generative model. 
-We believe this is the first work which aims to solve conditional generation with flow maps which is compatible with standard unconditional flow maps without any fine-tuning. 
+To overcome this, rather than training a neural network to parameterise the vector field defining the ODE, we can train a neural network to parameterise the function corresponding to the displacement by following the ODE, aka a flow map. 
 
-We use normalising flows. 
+In other words a flow map is the integral of the ODE. 
+
+There have been several methods to train flow maps, some of which start from a flow model. 
+
+MeanFlow provides a method to train a flow map from scratch without requiring starting with a pretrained flow model. 
+
+In many applications, we seek to perform conditional generation, which means to generate samples that satisfy a given condition. 
+
+A notable example, which we focus on in this project is inverse problem solving. 
+
+Given an observation y = Ax + e, which was obtained by corrupting a sample x from the data distribution (e.g. blurring, masking or noising an image), the goal of inverse problem solving is to recover plausible samples x from the data distribution which are consistent with the observation y. 
+
+Several methods exist for to perform conditional generation, which either train a conditional generative model from scratch or fine-tunes a pre-trained unconditional generative model for the conditional task (examples are CFG or GFT)
+
+However, this can be expensive and impractical, especially when training of the generative model is required to solve each new conditional generation task, and when the generative model is very large as is the case for image or video generation. 
+
+Additionally, fine-tuning a generative model to solve a conditional task may degrade its ability to perform unconditional generation. 
+
+Therefore, it is necessary to develop methods to perform conditional generation which utilise a pre-trained unconditional generative model rather than requiring training a new generative model from scratch or fine-tuning a model to solve the task. 
+
+Such methods for flow and diffusion models are well-developed, and typically work by nudging the sampling trajectory at each step from noise to data, so that the trajectory ends at a sample which satisfies the condition. 
+
+However these methods, which are known as guidance mechanisms do not transfer to flow maps. 
+
+This is because once the starting noise is sampled, flow maps directly maps this to a data sample, and so there is no such sampling trajectory to nudge. 
+
+The only control over the output of the flow map is the initial noise sample. 
+
+Variational Flow Maps use this insight to reframe the problem of conditional generation from steering the trajectory from noise to data to instead finding the right initial noise samples whose corresponding trajectories land at data which satisfies the given condition. 
+
+In particular, given a measurement y, there is a region of the data distribution (or really the flow map’s induced distribution) containing data which is consistent with that measurement. 
+
+Consider pulling that distribution backwards through the flow map into noise space. 
+
+this distribution is well defined for flow models (but not for diffusion models) because for flow models there is a bijection between noise and data samples, which is due to the fact that noise leads to data determinisitcally via the learned ODE. 
+
+this noise distribution exactly what we wish to sample from to solve conditional generation
+
+It turns out that the density of this noise distribution can be evaluated up to a normalising constant. 
+
+Variational inference provides a general framework for approximating such distributions which can only be evaluated up to a normalising constant. 
+
+VFM takes exactly this approach and approximates this noise distribution using a Gaussian distribution. 
+
+In particular, VFM learns a ‘noise adapter’ parameterised by a neural network, which given an observation y as input, outputs the mean and variance of a gaussian distribution which approximates the corresponding noise distribution for observation y. This is commonly known as amortised variational inference. 
+
+However, because the true noise distribution is more complex than a simple Gaussian, the authors find that the Gaussian adapter fails. 
+
+To overcome this, the authors jointly train the noise adapter with the flow map so that the geometry of the noise space can deform in a way such that the noise distribution can be effectively approximated by a simple Gaussian. 
+
+While successful, a natural alternative approach, which avoids fine-tuning the flow map, is to instead make the variational family (i.e. the noise adapter) more expressive so that is can approximate the complex noise distribution without joint training with the flow map
+
+The variational training objective used to train the noise adapter requires using a variational distribution that can both be sampled and whose density can be evaluated exactly
+
+Normalising flows enables both operations, while also having capacity to model complex distributions. 
+
+Like flow models, normalising flows model a distribution as a transformation of a simple noise distribution, but instead as a chain of discrete invertible maps. 
+
+It is precisely this invertibility of the learned transformation which enables evaluation of the density using the change of variables formula. 
+
+In our project, we extend variational flow maps by using a normalising flow as the noise adapter, while keeping the flow map fixed rather than performing joint training.  
+
+Additionally, in the amortised setting, we can train the normalising flow via maximum likelihood cheaply, and so we additionally train this way beyond the variational objective. 
+
+Our method hence enables conditional generation which is both fast (generating samples in a single function evaluation via a flow map) and which can be used with any existing unconditional pre-trained flow map, without any fine-tuning. 
+
+In particular, a single pre-trained unconditional model can serve many conditional generation tasks, each requiring training a relatively small noise adapter, as opposed to fine-tuning the large generator for each new task.
+
+% Diffusion models are a predominant method for generative modelling. How do they work? Explain why they are limited by requiring several forward passes at inference time. 
+
+% Flow maps overcome this limitation. Explain how they work. 
+
+% Often we want to do conditional generation. For example, given a prompt, or class, generate an image. 
+% Inverse problem solving is a canonical example. Explain it. 
+
+% Using a flow model, several methods achieve conditional generating by nudging the sampling trajectory at each step. 
+% Importantly, such methods can be designed to simply use a pre-trained uncodontional flow model and do not require any fine-tuning. 
+
+% When doing one-step generation with flow maps, we jump from noise to data directly, so these training-free guidance-based methods cannot be used to enable conditional generation with pre-trained unconditional flow maps.  
+% To achieve conditional generation with flow maps, several methods therefore fine-tune or train flow map from scratch to solve the conditional generation task. 
+
+% One such method which fine-tunes the flow map is Variational Flow maps. 
+% Rather than guiding the trajectory from noise to data, they frame conditional generation as finding the right starting noise which maps to data satisying the condition. 
+% In particular, they learn a noise adapter which given a condition predict the right starting noise. 
+% They use a noise adapter which models the starting noise distirbution as a simple gaussian. 
+% Because a gaussian is very simple, they hence jointly train the noise adapter with the flow map. 
+% Our project hypothesises that by making the noise adapter more expressive, we can find the right noise without fine-tuning the noise adapter. 
+
+% While methods such as GFT or VFM enable one-step conditional generation, such methods require fine-tuning or training a flow map from scratch rather than being methods which are compatible with a pre-trained unconditional flow map. 
+% Furthermore, while methods exist for conditional generation with flow or diffusion models, which are compatible with pre-trained unconditional flow models, these methods are all very slow because they require many forward passes of a denoising neural network. 
+% Our project allows for both one-step generation and does not require any fine-tuning of the generative model. 
+% We believe this is the first work which aims to solve conditional generation with flow maps which is compatible with standard unconditional flow maps without any fine-tuning. 
+
+% We use normalising flows. 
 
 Summarise the argument in a paragraph. 
 \section{Contributions}
+Method. We propose one-step conditional generation with a frozen, pretrained flow map by learning an amortised normalising-flow noise adapter, as an alternative to VFM's joint fine-tuning of adapter and generator.
+Training objectives. We train the adapter with reverse KL, with forward KL on exact generator-sampled pairs, and with a mixed objective whose reverse-KL weight is calibrated by gradient share; for inpainting we introduce a β-weighted observation term.
+Evaluation. We propose an evaluation framework that separates the adapter's error (q_{φ,θ} vs p_θ) from the flow map's error (p_θ vs p_data), measurable wherever reference posterior samples are available.
+Empirical results. With the map frozen, the flow adapter recovers multimodal posteriors a Gaussian cannot (checkerboard MMD 0.045 vs 0.298, close to VFM's 0.033) and matches an exact rejection-sampled posterior on brightness steering (FID 0.98 vs 35.3 for a Gaussian). On 4× super-resolution it achieves the best MMD of all methods and near-best FID in a single network evaluation (0.002 s per image, against 28–500 evaluations for guidance baselines), and beats VFM on FID, MMD and CRPS while leaving the generator unchanged.
+Failure analysis. On inpainting the adapter falls well short of the baselines (measurement residual 9.4 against 2.5–3.5); we show this is not caused by out-of-distribution latents, the flow map's coverage of real images, or the ambiguity of the hole, but by one-pass amortised inference into a highly many-to-one map — motivating intermediate-time adapters as future work.
 
 \section{Thesis Overview}
 
