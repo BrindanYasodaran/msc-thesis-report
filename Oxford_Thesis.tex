@@ -33,6 +33,28 @@
 \fancyfoot[C]{\thepage}
 \fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}\fancyfoot[C]{\thepage}}
 
+% --- raw Unicode symbols used in the draft, mapped to LaTeX (works in text and math) ---
+\DeclareUnicodeCharacter{207B}{\ensuremath{^{-}}}
+\DeclareUnicodeCharacter{2074}{\ensuremath{^{4}}}
+\DeclareUnicodeCharacter{2075}{\ensuremath{^{5}}}
+\DeclareUnicodeCharacter{03B2}{\ensuremath{\beta}}
+\DeclareUnicodeCharacter{03B5}{\ensuremath{\epsilon}}
+\DeclareUnicodeCharacter{03B8}{\ensuremath{\theta}}
+\DeclareUnicodeCharacter{03BC}{\ensuremath{\mu}}
+\DeclareUnicodeCharacter{03C3}{\ensuremath{\sigma}}
+\DeclareUnicodeCharacter{03C4}{\ensuremath{\tau}}
+\DeclareUnicodeCharacter{03C6}{\ensuremath{\phi}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\DeclareUnicodeCharacter{2208}{\ensuremath{\in}}
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+% --- figure column-image macros (must live in the preamble: definitions inside a figure are local to it) ---
+\newcommand{\bimg}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{sr_baseline_panels/col_#1.png}}}
+\newcommand{\bimginp}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{inp_baseline_panels/col_#1.png}}}
+\newcommand{\himg}[2]{\raisebox{-.5\height}{\includegraphics[width=#1\linewidth]{inp_failure/#2.png}}}
+
+
 
 %%%%% FONTS AND ENCODING
 \usepackage[T1]{fontenc}
@@ -205,18 +227,36 @@ Finally, family.
 
 \chapter{Introduction}                 
 \section{Motivation}
-% Diffusion models are a predominant method for generative modelling. How do they work? Explain why they are limited by requiring several forward passes at inference time. 
+Diffusion models are a predominant method for generative modelling. How do they work? Explain why they are limited by requiring several forward passes at inference time. 
 
-% Flow maps overcome this limitation. Explain how they work. 
+Flow maps overcome this limitation. Explain how they work. 
 
-% Explain what is conditional generation. What are examples of conditional generation, and why it is important. Explain how conditional generation is performed for diffusion models, and subsequently why this is not possible for flow maps. 
+Often we want to do conditional generation. For example, given a prompt, or class, generate an image. 
+Inverse problem solving is a canonical example. Explain it. 
 
-% Explain the approach that variational flow maps takes to solve this. Explain how VFM provides a very general framework, which solves reward steering, and many types of guidance are instances of reward steering. 
+Using a flow model, several methods achieve conditional generating by nudging the sampling trajectory at each step. 
+Importantly, such methods can be designed to simply use a pre-trained uncodontional flow model and do not require any fine-tuning. 
 
-% Explain the main limitation of their method (joint training), and convince the reader that this really is an important problem to solve. Explain the philosophy of my solution (make noise adapter more expressive), and explain the benefits of this over joint training. Explain specifically how I instantiate this solution using NF adapter. 
+When doing one-step generation with flow maps, we jump from noise to data directly, so these training-free guidance-based methods cannot be used to enable conditional generation with pre-trained unconditional flow maps.  
+To achieve conditional generation with flow maps, several methods therefore fine-tune or train flow map from scratch to solve the conditional generation task. 
 
-% Summarise the argument in a paragraph. 
+One such method which fine-tunes the flow map is Variational Flow maps. 
+Rather than guiding the trajectory from noise to data, they frame conditional generation as finding the right starting noise which maps to data satisying the condition. 
+In particular, they learn a noise adapter which given a condition predict the right starting noise. 
+They use a noise adapter which models the starting noise distirbution as a simple gaussian. 
+Because a gaussian is very simple, they hence jointly train the noise adapter with the flow map. 
+Our project hypothesises that by making the noise adapter more expressive, we can find the right noise without fine-tuning the noise adapter. 
+
+While methods such as GFT or VFM enable one-step conditional generation, such methods require fine-tuning or training a flow map from scratch rather than being methods which are compatible with a pre-trained unconditional flow map. 
+Furthermore, while methods exist for conditional generation with flow or diffusion models, which are compatible with pre-trained unconditional flow models, these methods are all very slow because they require many forward passes of a denoising neural network. 
+Our project allows for both one-step generation and does not require any fine-tuning of the generative model. 
+We believe this is the first work which aims to solve conditional generation with flow maps which is compatible with standard unconditional flow maps without any fine-tuning. 
+
+We use normalising flows. 
+
+Summarise the argument in a paragraph. 
 \section{Contributions}
+
 \section{Thesis Overview}
 
 \chapter{Background}           
@@ -1928,7 +1968,6 @@ Importantly, while all guidance methods require at least 28 NFE, our method only
 \centering
 \scriptsize
 \setlength{\tabcolsep}{1.5pt}
-\renewcommand{\bimg}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{sr_baseline_panels/col_#1.png}}}
 \begin{tabular}{ccccccccc}
 Truth & Measurement & DPS & DAPS & MPGD & FlowChef & FlowDPS & VFM & NF (ours) \\
 \bimg{gt} & \bimg{meas} & \bimg{dps} & \bimg{daps} &
@@ -2090,7 +2129,6 @@ This is clearly a harder task to learn, and we further investigate why the norma
 \centering
 \scriptsize
 \setlength{\tabcolsep}{1.5pt}
-\newcommand{\bimginp}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{inp_baseline_panels/col_#1.png}}}
 \begin{tabular}{ccccccccc}
 Truth & Measurement & DPS & DAPS & MPGD & FlowChef & FlowDPS & VFM & NF (ours) \\
 \bimginp{gt} & \bimginp{meas} & \bimginp{dps} & \bimginp{daps} &
@@ -2131,9 +2169,166 @@ adapter is the 12{,}000-step $\beta = 500$ model. Best in bold.}
 \label{tab:inp_baselines}
 \end{table}
 
+\subsubsection{Failure Analysis}
+We now investigate why our method fails for inpainting. 
+We investigate four plausible hypothesises, each outlining a separate failure mechanism. 
+
+\textbf{Hypothesis 1 — The noise adapter generates out-of-distribution latents}
+\begin{figure}[t]
+\centering
+\fontsize{7pt}{8pt}\selectfont
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{ccc}
+Truth & Measurement & Samples \\
+\himg{0.115}{h1s_truth} & \himg{0.115}{h1s_meas} & \himg{0.69}{h1s_samples} \\
+\end{tabular}
+\caption{Two observations on which the noise adapter fails (top: airplane,
+bottom: dog): the ground truth, the observation, and eight samples from the
+adapter.}
+\label{fig:h1_samples}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{inp_failure/h1_norms}
+\caption{Norms of 10{,}000 latents produced by the noise adapter for each of
+the two observations of Figure~\ref{fig:h1_samples}, against 10{,}000
+standard-normal samples. For $z \sim \mathcal{N}(0, I_D)$ with $D = 3072$,
+$\|z\|_2$ follows a chi distribution with mean $\sqrt{D - 1/2} \approx 55.4$
+and standard deviation $1/\sqrt{2} \approx 0.71$.}
+\label{fig:h1_norms}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{cccccc}
+Measurement & Latent 1 & Latent 2 & Latent 3 & Mean & Std \\
+\himg{0.145}{h1l_meas} & \himg{0.145}{h1l_z1} & \himg{0.145}{h1l_z2} &
+\himg{0.145}{h1l_z3} & \himg{0.145}{h1l_mean} & \himg{0.145}{h1l_std} \\
+\end{tabular}
+\caption{Latents of the noise adapter for the two observations of
+Figure~\ref{fig:h1_samples} (top: airplane, bottom: dog): three individual
+latents, and the per-pixel mean and standard deviation of 10{,}000 latents.
+Latents and the mean are contrast-stretched symmetrically about zero; the
+standard deviation is scaled to its maximum.}
+\label{fig:h1_latents}
+\end{figure}
+
+Our frozen flow map is only trained only on standard-normal inputs, so latents that deviate from typical standard normal samples likely do not decode to realistic images from the cifar10 data distribution. 
+Given that our method achieves an FID~ of 11.6~\ref{tab:inp_baselines} this indicates that the noise adapter produces latents which decode to samples that do indeed deviate from real cifar10 images, but not significantly so. 
+For context, the best FID of all baselines is 6.84. 
+
+To investigate the hypothesis more directly, we can compare the distribution of the norms of the latents produced by our noise adapter, against the norms of standard normal latents. 
+It can be proven that for z ~ N(0, I_D) the norm ||z|| follows a chi distribution with D degrees of freedom. For D=3072, we compute a mean of 55.421 with standard deviation of 0.707. 
+We compare this distribution against samples from our noise adapter q_phi(x | y) separately for two representative observations y, shown in Figure~\ref{fig:h1_samples}. We deliberately chose two observations for which our method fails on. 
+Figure~\ref{fig:h1_norms} shows that the adapter's latents are tightly concentrated (with standard deviation of 0.7), however have a mean of 53.2. 
+This is evidence that the samples are indeed slightly out-of-distribution. 
+
+Figure\ref{fig:h3_samples} shows that individual latents are indistinguishable from noise. However, the per-pixel mean over 10,000 latents for a given observation does show an imprint of the observation. This is further evidence that the noise adapter samples are out-of-distribution, because true samples drawn from a standard normal should not contain such structure. 
+Figure\ref{fig:h3_samples} also shows that the per-pixel standard deviation is lower over the observed pixels than in the masked region. This indicates that the noise adapter has correctly learnt that the observation constrains certain directions in the noise space (corresponding to the observed pixels), while keeping the other directions (corresponding to the masked region) free. 
+
+To conclude, we attribute part of the failure of our method to 
+latents being out-of-distirbution. However this hypothesis, still does not fully explain why our method obtains such a poor residual of 9.4. 
+
+\textbf{Hypothesis 2 - The flow map has not learned the data manifold sufficiently well}
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l ccccccc}
+\toprule
+Test Set & Residual $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ \\
+\midrule
+Real images       & 9.41 & 19.69 & 0.564 & 0.065 & 11.61 & 0.062 & 8.46 \\
+Generated images  & 8.90 & 20.05 & 0.595 & 0.057 & 11.16 & 0.067 & 8.17 \\
+\bottomrule
+\end{tabular}
+\caption{The inpainting adapter (12{,}000 steps, $\beta = 500$) evaluated on
+9{,}000 observations from real test images and on 9{,}000 observations from
+images generated by the flow map itself, under the protocol of
+Table~\ref{tab:inp_baselines}. For generated images, FID and MMD are computed
+against the generated images. Perfect-fit residual $2.57$.}
+\label{tab:h2_gen_vs_real}
+\end{table}
 
 
-\chapter{Conclusion}                                
+Given a measurement, y, produced from a real cifar10 image, if there simply does not exist a standard normal noise sample, which decodes under the flow map to an image whose observed pixels match y, then the noise adapter will also not be able to produce such noise itself (without deviating from standard normal). 
+
+In other words, if the flow map has not modelled the cifar10 data distribution sufficiently well, for certain observations, y, there is simply no such noise region for the noise adapter to find which contains noise that decodes to images which matches those observations. 
+
+To test this hypothesis, we can simply evaluate our method on observations which are built from images that the flow map generated itself. 
+By construction, for all observations produced in this way, there does exist a noise region which decodes under the flow map to sample(s) whose pixels match the observation. 
+
+Table~\ref{tab:h2_gen_vs_real} shows that when evaluating our method on observations built from images generated by the flow map, every metric improves, but only modestly. In particular,the residual only improves from 9.42 to 8.90.  
+
+This indicates that even when, by construction, there does exist a region in noise space which decodes onto images whose pixels match the observation, the noise adapter simply struggles to find this region. 
+Hence we attribute the failure of our method only partly to this hypothesis. 
+
+\textbf{Hypothesis 3 - The ambiguity of the masked region makes it difficult to learn q_phi(z | y)}
+
+\begin{figure}[t]
+\centering
+\fontsize{7pt}{8pt}\selectfont
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{ccc}
+Truth & Measurement & Samples \\
+\himg{0.115}{h3s_truth} & \himg{0.115}{h3s_meas} & \himg{0.69}{h3s_samples} \\
+\end{tabular}
+\caption{Inversion: the same two images as Figure~\ref{fig:h1_samples}
+(top: airplane, bottom: dog), now observed in full with measurement noise
+($\sigma = 0.05$), and six samples from an adapter trained for this
+inversion task. Even with every pixel observed, the adapter does not recover
+the image; for the dog it produces a ship.}
+\label{fig:h3_samples}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l ccccccc}
+\toprule
+Task & Residual $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & FID $\downarrow$ & MMD $\downarrow$ & CRPS $\downarrow$ \\
+\midrule
+Inpainting  & 9.41 & 19.69 & 0.564 & 0.065 & 11.61 & 0.062 & 8.46 \\
+Inversion   & 9.83 & 21.33 & 0.623 & 0.049 & 33.07 & 0.160 & 12.63 \\
+\bottomrule
+\end{tabular}
+\caption{The inpainting adapter and an adapter trained for full-image
+inversion ($y = x + \sigma\epsilon$, all pixels observed), both evaluated on the
+same 9{,}000 real test images under the protocol of
+Table~\ref{tab:inp_baselines}. Perfect-fit residuals are $2.57$ for inpainting
+(2{,}640 observed values) and $2.77$ for inversion (3{,}072).}
+\label{tab:h3_inversion}
+\end{table}
+
+For a given observation, assuming there does exist a noise region which decodes under the flow map to images whose pixels match the observatio and fill in the masked region in a realistic way, this region may still be difficult to find because the noise adapter must constrain the learned distribution to be very tight in certain directions (corresponding to the observed pixels) and be broad in other directions (corresponding to the ambiguity of the masked region). 
+This distirbution may be too difficult for the noise adapter to learn. 
+
+To test this hypothesis, we train a normalising flow adapter, which given as input a noised observation with no masking, to produce noise which decodes onto samples consistent with this observation. 
+Table~\ref{tab:h3_inversion} shows that a normalising flow adapter trained on this inversion task, for which there is no ambiguity regarding a masked region, still struggles. In particular, we find that residual is still very high at 9.83. 
+Figure~\ref{fig:h3_samples} confirms this and shows that given the noised dog observation, the adapter's decoded latents are all ship images. 
+Hence we conclude that ambiguity of the masked region in the inpainting task is not, by itself, the core reason why our method fails. 
+
+\chapter{Conclusion}       
+To conclude, we have ruled out flow map quality, out-of-distribution latents and ambiguity of the masked region as sole culprits for the failure of our method. 
+We believe that instead the failure on the inpainting task (and inversion) arises due to the difficulty of predicting latents in the nosie space at time t=1. 
+This is clearest in the case of inversion, where the observation gives complete information for every pixel in the image. 
+Consider the pullback of the posterior p_theta(x | y) through the flow map at an arbitrary time point (rather than to time t=1). 
+Call this distribution q_phi,t(z | y). 
+Our noise adapter tries to predict q_phi,0(z | y). 
+However, as t increases, q_phi,t(z | y) is easier to learn because we already have the observation y. 
+We expect that predicting noise further along the trajectory, rather than at time t=1, will be easier to learn. 
+We can then use a single decode from the flow map to take the intermediate point x_t to time t=0, giving a sample. 
+
+Ultimately, npise space is very far away from data space, so it is difficult to find the noise which decodes onto the correct region in data space, especially when given very complete information on which region of the data space to decode to (in the case of inpainting and inversion). It is easier to to find the region at a further time point along the trajectory, which decodes onto the correct data region under the flow map. 
+
+This motivates future work to train the noise adapter to predict the latent further along the trajectory, potentially with the exact time point t also being predicted by the noise adapter. This way, depending on how much ambiguity there is regarding the whole, the noise adapter learns whether to predict a latent further or earlier along the trajectory. 
+
+
 \section{Summary}
 \section{Future Work}
 \section{Critical Evaluation}
