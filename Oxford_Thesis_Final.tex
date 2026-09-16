@@ -1,0 +1,403 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% OXFORD MSc THESIS
+%%
+%% Plain `report' class, styled to match the layout used by recent
+%% MSc in Advanced Computer Science submissions:
+%%   - 12pt, A4, one-sided, symmetric margins
+%%   - one-and-a-half line spacing
+%%   - standard "Chapter N / Title" headings (no epigraphs, no minitoc)
+%%   - plain centred page numbers, no running heads
+%%
+%% Everything lives in this one file: preamble, front matter, chapters,
+%% and appendices.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[12pt,a4paper]{report}
+
+
+%%%%% PAGE LAYOUT
+% Measured to match the reference layout: 405pt text block, first baseline
+% 121pt from the top, last baseline 85pt from the foot, folio 55pt up.
+\usepackage[a4paper,hmargin=3.35cm,top=3.83cm,bottom=2.86cm,footskip=26pt]{geometry}
+
+% One-and-a-half spacing for body text.  Captions, footnotes and floats
+% stay single-spaced (setspace does this automatically).
+\usepackage{setspace}
+\onehalfspacing
+
+% Plain centred page number at the foot of every page; no running heads.
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\thepage}
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}\fancyfoot[C]{\thepage}}
+
+% --- raw Unicode symbols used in the draft, mapped to LaTeX (works in text and math) ---
+\DeclareUnicodeCharacter{207B}{\ensuremath{^{-}}}
+\DeclareUnicodeCharacter{2074}{\ensuremath{^{4}}}
+\DeclareUnicodeCharacter{2075}{\ensuremath{^{5}}}
+\DeclareUnicodeCharacter{03B2}{\ensuremath{\beta}}
+\DeclareUnicodeCharacter{03B5}{\ensuremath{\epsilon}}
+\DeclareUnicodeCharacter{03B8}{\ensuremath{\theta}}
+\DeclareUnicodeCharacter{03BC}{\ensuremath{\mu}}
+\DeclareUnicodeCharacter{03C3}{\ensuremath{\sigma}}
+\DeclareUnicodeCharacter{03C4}{\ensuremath{\tau}}
+\DeclareUnicodeCharacter{03C6}{\ensuremath{\phi}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\DeclareUnicodeCharacter{2208}{\ensuremath{\in}}
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+% --- figure column-image macros (must live in the preamble: definitions inside a figure are local to it) ---
+\newcommand{\bimg}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{sr_baseline_panels/col_#1.png}}}
+\newcommand{\bimginp}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{inp_baseline_panels/col_#1.png}}}
+\newcommand{\himg}[2]{\raisebox{-.5\height}{\includegraphics[width=#1\linewidth]{inp_failure/#2.png}}}
+
+
+
+%%%%% FONTS AND ENCODING
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{microtype}
+\usepackage[english]{babel}
+\usepackage{csquotes}
+
+
+%%%%% MATHS
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{bm}
+
+% Uncomment for equation numbers per section (2.3.12) instead of per chapter (2.18):
+%\numberwithin{equation}{section}
+
+
+%%%%% GRAPHICS, TABLES, FLOATS
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{rotating}
+\usepackage{subcaption}
+\usepackage[font=small,labelfont=bf]{caption}
+
+% Discourage figure-only pages.
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
+\setlength{\textfloatsep}{20pt plus 15pt minus 4pt}
+
+
+%%%%% LISTS
+\usepackage{enumitem}
+
+
+%%%%% BIBLIOGRAPHY
+% Numeric citations, references listed in order of first appearance.
+\usepackage[style=numeric-comp, sorting=none, backend=biber, doi=false, isbn=false]{biblatex}
+\addbibresource{references.bib}
+\renewcommand*{\bibfont}{\raggedright\small}
+
+\usepackage{notoccite}   % stop citations in captions polluting the bibliography order
+
+
+%%%%% CROSS-REFERENCES (load hyperref late, cleveref last)
+\usepackage[pdfpagelabels]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+
+%%%%% SECTION NUMBERING DEPTH
+% 0 = chapter, 1 = section, 2 = subsection, 3 = subsubsection
+\setcounter{secnumdepth}{2}   % deepest level that gets a number
+\setcounter{tocdepth}{2}      % deepest level shown in the table of contents
+
+
+%%%%% THESIS DETAILS -- edit these
+\newcommand{\thesistitle}{Suitably Impressive Thesis Title}
+\newcommand{\candidatenumber}{1234567}
+\newcommand{\thesiswordcount}{15000}
+\newcommand{\thesisdegree}{Master of Science in Advanced Computer Science}
+\newcommand{\thesisdate}{Trinity 2026}
+
+
+%%%%% PERSONAL MACROS
+% A good place to collect your own shorthands as they come up.
+% Ordinal superscripts: 4\th place, 1\st, 2\nd, 3\rd
+% (\th normally prints the thorn character; we override it, as the Oxford
+% template did. Use \textthorn if you ever need the letter.)
+\providecommand{\st}{}\renewcommand{\st}{\textsuperscript{st}}
+\providecommand{\nd}{}\renewcommand{\nd}{\textsuperscript{nd}}
+\providecommand{\rd}{}\renewcommand{\rd}{\textsuperscript{rd}}
+\providecommand{\th}{}\renewcommand{\th}{\textsuperscript{th}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%% TITLE PAGE
+\begin{titlepage}
+  \centering
+  \vspace*{0.14\textheight}
+
+  {\LARGE\bfseries \thesistitle \par}
+
+  \vspace{22mm}
+  {\includegraphics[width=3.2cm]{figures/newlogo.pdf} \par}
+  \vspace{22mm}
+
+  {\large Candidate Number: \candidatenumber \par}
+  \vspace{1.5ex}
+  {University of Oxford \par}
+  \vspace{1.5ex}
+  {Word Count: \thesiswordcount \par}
+
+  \vspace{18mm}
+
+  {A thesis submitted for the degree of \par}
+  \vspace{1.5ex}
+  {\itshape \thesisdegree \par}
+  \vspace{2.5ex}
+  {\thesisdate \par}
+
+  \vfill
+\end{titlepage}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  FRONT MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Roman page numbers, restarting at i.  Page numbers are hidden on the
+% abstract and acknowledgements, and become visible from the ToC onwards.
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\chapter*{Abstract}
+\thispagestyle{empty}
+
+Your abstract goes here. Check your departmental regulations, but this is
+usually expected to be under 300 words --- roughly one page.
+
+A workable structure is one paragraph per move: (1) context and why the
+problem matters, (2) the gap, (3) what you did, (4) what you found, and
+(5) what it means more broadly.
+
+\clearpage
+
+
+\chapter*{Acknowledgements}
+\thispagestyle{empty}
+
+Thank your supervisors first, then anyone whose ideas or feedback shaped
+the direction of the work.
+
+Then colleagues, collaborators, and friends.
+
+Then any funding or institutional support you received.
+
+Finally, family.
+
+\clearpage
+
+
+\tableofcontents
+\clearpage
+
+\listoffigures
+\clearpage
+
+% Uncomment if you have tables worth listing:
+%\listoftables
+%\clearpage
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  MAIN MATTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+
+\chapter{Introduction}
+
+\section{Motivation}
+
+\section{Contributions}
+
+\section{Thesis Overview}
+
+\chapter{Background}
+
+\section{Generative Modelling}
+
+\subsubsection{The Goal of Generative Modelling}
+
+\subsection{Reward Alignment}
+
+\subsection{Inverse Problems}
+
+\subsubsection{Relation to Reward Alignment}
+
+\section{Flow-based generative models}
+
+\subsection{Normalising Flows}
+
+\subsubsection{Constructing Normalising Flows}
+
+\subsubsection{Training Normalising Flows}
+
+\subsubsection{Forward KL divergence}
+
+\subsubsection{Reverse KL divergence}
+
+\subsection{Flow Matching}
+
+\subsubsection{ODE Definition}
+
+\subsubsection{Flow Model Definition}
+
+\subsubsection{Sampling from a Flow Model}
+
+\subsubsection{Flow Matching}
+
+\subsection{Flow Maps}
+
+\section{Variational Inference}
+
+\subsection{Amortised VI}
+
+\subsection{Stochastic VI}
+
+\section{Variational Flow Maps}
+
+\subsection{Joint training of noise adapter and flow map}
+
+\chapter{Related Work}
+
+\section{The Reward-tilted vector field}
+
+\section{Estimating the Value Function with Flow models}
+
+\subsubsection{Make the reward function robust to noise.}
+
+\subsubsection{Approximating the posterior as the mean}
+
+\subsubsection{Monte Carlo approximation of the posterior}
+
+\subsubsection{Sequential Monte Carlo}
+
+\subsection{Estimating the Value Function with Flow Maps}
+
+\chapter{Method}
+
+\section{The noise adapter as a normalising flow}
+
+\section{Training objectives}
+
+\subsection{Reverse KL}
+
+\subsection{Forward KL}
+
+\subsection{Mixed Objective}
+
+\subsection{$\beta$-VAE}
+
+\subsection{Noise Augmentation}
+
+\section{Building the noise adapter}
+
+\subsection{Low-dimensional Toy Problems}
+
+\subsection{Image-scale Problems}
+
+\section{Evaluation Framework}
+
+\subsubsection{Additional metrics for Low-dimensional experiments}
+
+\subsubsection{Image-scale experiments}
+
+\chapter{Experiments and Results}
+
+\section{2D Checkerboard Example}
+
+\subsection{The Data Distribution}
+
+\subsection{Defining the Inverse Problem}
+
+\subsection{Base Flow Map Training}
+
+\subsection{Noise Adapter Training}
+
+\subsubsection{Normalising Flow Adapter}
+
+\subsubsection{Gaussian Adapter with frozen $\theta$}
+
+\subsubsection{VFM}
+
+\subsection{Results}
+
+\section{Image Inverse Problems}
+
+\subsection{Common Setup}
+
+\subsubsection{Base Flow Map}
+
+\subsubsection{TarFlow Noise Adapter Hyperparameters}
+
+\subsection{Brightness Steering}
+
+\subsubsection{Adapter Training}
+
+\subsubsection{Results}
+
+\subsection{Super-Resolution}
+
+\subsubsection{Noise Adapter Training details}
+
+\subsubsection{Objective Ablation}
+
+\subsubsection{Comparison with Baselines}
+
+\subsection{Inpainting}
+
+\subsubsection{Noise Adapter Training details}
+
+\subsubsection{$\beta$-VAE Ablation}
+
+\subsubsection{Comparison with Baselines}
+
+\subsubsection{Failure Analysis}
+
+\chapter{Conclusion}
+
+\section{Summary}
+
+\section{Future Work}
+
+\section{Critical Evaluation}
+
+\printbibliography[heading=bibintoc,title={Bibliography}]
+
+\appendix
+
+\chapter{Supplementary Material}
+
+\section{Change of Variables}
+
+\section{Score functions and score matching}
+
+\section{Additional Experiments}
+
+\subsection{GMM Experiments}
+
+\subsubsection{Capacity Reward Hack in SR Inverse Problem}
+
+\end{document}

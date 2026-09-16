@@ -1,6 +1,7 @@
 {
   // ---------------------------------------------------------------------
-  // macOS PATH fix.
+  // PATH fix (LINUX REMOTE copy: TinyTeX in ~/.local/bin;
+  // the macOS original is saved as settings.json.mac.bak).
   //
   // /Library/TeX/texbin reaches the shell via /etc/paths.d/TeX, which is
   // read by path_helper during shell startup.  VS Code launched from the
@@ -11,37 +12,39 @@
   // spawns pdflatex and biber by bare name, so each tool also needs a PATH
   // in its environment.
   // ---------------------------------------------------------------------
+  "latex-workshop.latex.outDir": "%DIR%/build",
   "latex-workshop.latex.tools": [
     {
       "name": "latexmk",
-      "command": "/Library/TeX/texbin/latexmk",
+      "command": "/homes/55/josephmiller/.local/bin/latexmk",
       "args": [
         "-synctex=1",
         "-interaction=nonstopmode",
         "-file-line-error",
+        "-f",
         "-pdf",
         "-outdir=%OUTDIR%",
         "%DOC%"
       ],
-      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+      "env": { "PATH": "/homes/55/josephmiller/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin" }
     },
     {
       "name": "latexmk_rconly",
-      "command": "/Library/TeX/texbin/latexmk",
+      "command": "/homes/55/josephmiller/.local/bin/latexmk",
       "args": ["%DOC%"],
-      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+      "env": { "PATH": "/homes/55/josephmiller/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin" }
     },
     {
       "name": "pdflatex",
-      "command": "/Library/TeX/texbin/pdflatex",
+      "command": "/homes/55/josephmiller/.local/bin/pdflatex",
       "args": ["-synctex=1", "-interaction=nonstopmode", "-file-line-error", "%DOC%"],
-      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+      "env": { "PATH": "/homes/55/josephmiller/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin" }
     },
     {
       "name": "biber",
-      "command": "/Library/TeX/texbin/biber",
+      "command": "/homes/55/josephmiller/.local/bin/biber",
       "args": ["%DOCFILE%"],
-      "env": { "PATH": "/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin" }
+      "env": { "PATH": "/homes/55/josephmiller/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin" }
     }
   ],
 
@@ -54,12 +57,12 @@
   ],
 
   // These helpers are invoked by bare name too, and hit the same problem.
-  "latex-workshop.kpsewhich.path": "/Library/TeX/texbin/kpsewhich",
-  "latex-workshop.synctex.path": "/Library/TeX/texbin/synctex",
-  "latex-workshop.texcount.path": "/Library/TeX/texbin/texcount",
-  "latex-workshop.latexindent.path": "/Library/TeX/texbin/latexindent",
-  "latex-workshop.formatting.latexindent.path": "/Library/TeX/texbin/latexindent",
-  "latex-workshop.texdoc.path": "/Library/TeX/texbin/texdoc",
+  "latex-workshop.kpsewhich.path": "/homes/55/josephmiller/.local/bin/kpsewhich",
+  "latex-workshop.synctex.path": "/homes/55/josephmiller/.local/bin/synctex",
+  "latex-workshop.texcount.path": "/homes/55/josephmiller/.local/bin/texcount",
+  "latex-workshop.latexindent.path": "/homes/55/josephmiller/.local/bin/latexindent",
+  "latex-workshop.formatting.latexindent.path": "/homes/55/josephmiller/.local/bin/latexindent",
+  "latex-workshop.texdoc.path": "/homes/55/josephmiller/.local/bin/texdoc",
 
   // ---------------------------------------------------------------------
   // Ghost text off for LaTeX: the grey italic continuation that appears
@@ -85,6 +88,12 @@
     "markdown": false,
     "scminput": false
   },
+
+  // Draft mode: the source currently has known errors; build to completion
+  // (-f above) and keep the "Recipe terminated" toasts quiet. Errors remain
+  // visible in the Problems panel and the compiler log when wanted.
+  "latex-workshop.message.error.show": false,
+  "latex-workshop.message.warning.show": false,
 
   // Rebuild on save; jump the PDF to the cursor after each build.
   "latex-workshop.latex.autoBuild.run": "onSave",

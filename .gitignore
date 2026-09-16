@@ -224,3 +224,7 @@ TSWLatexianTemp*
 
 # Reference material, not part of the thesis source
 context/
+
+# latexmk / LaTeX Workshop output directory, and biber error leftovers
+build/
+*-SAVE-ERROR
