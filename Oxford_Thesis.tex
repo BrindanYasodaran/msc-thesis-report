@@ -85,6 +85,7 @@
 \usepackage{array}
 \usepackage{longtable}
 \usepackage{rotating}
+\usepackage{float}
 \usepackage{subcaption}
 \usepackage[font=small,labelfont=bf]{caption}
 
@@ -340,7 +341,7 @@ Summarise the argument in a paragraph.
 \section{Contributions}
 Method. We propose one-step conditional generation with a frozen, pretrained flow map by learning an amortised normalising-flow noise adapter, as an alternative to VFM's joint fine-tuning of adapter and generator.
 Training objectives. We train the adapter with reverse KL, with forward KL on exact generator-sampled pairs, and with a mixed objective whose reverse-KL weight is calibrated by gradient share; for inpainting we introduce a β-weighted observation term.
-Evaluation. We propose an evaluation framework that separates the adapter's error (q_{φ,θ} vs p_θ) from the flow map's error (p_θ vs p_data), measurable wherever reference posterior samples are available.
+Evaluation. We propose an evaluation framework that separates the adapter's error ($q_{φ,θ}$ vs $p_θ$) from the flow map's error ($p_θ$ vs $p_data$), measurable wherever reference posterior samples are available.
 Empirical results. With the map frozen, the flow adapter recovers multimodal posteriors a Gaussian cannot (checkerboard MMD 0.045 vs 0.298, close to VFM's 0.033) and matches an exact rejection-sampled posterior on brightness steering (FID 0.98 vs 35.3 for a Gaussian). On 4× super-resolution it achieves the best MMD of all methods and near-best FID in a single network evaluation (0.002 s per image, against 28–500 evaluations for guidance baselines), and beats VFM on FID, MMD and CRPS while leaving the generator unchanged.
 Failure analysis. On inpainting the adapter falls well short of the baselines (measurement residual 9.4 against 2.5–3.5); we show this is not caused by out-of-distribution latents, the flow map's coverage of real images, or the ambiguity of the hole, but by one-pass amortised inference into a highly many-to-one map — motivating intermediate-time adapters as future work.
 
@@ -361,7 +362,7 @@ While certain classes of objects of discrete nature, for example text and graph 
 
 For illustration, let us choose the class of objects we want to generate to be images of cats.  
 In the space of $R^D$, some regions of the space will contain vectors corresponding to images of cats, while other regions do not. 
-In fact, the manifold hypothesis states that a class of objects form a manifold in R^D. 
+In fact, the manifold hypothesis states that a class of objects form a manifold in $R^D$. 
 In machine learning, we assume there exists an underlying unkown probability distribution over $R^D$ which places more density in regions of space which contain vectors corresponding to images that look more like a cat. 
 More generally, given an arbitrary object class in $R^D$, we assume there exists an underlying probability distribution $p_\text{data}$ over $R^D$ which concentrates its mass on those vectors that are plausible instances of the class, and assigns negligible mass elsewhere
 
@@ -400,7 +401,7 @@ The 'forward problem' is computing the observation $y$ from a clean object $x$.
 The inverse problem is the reverse.
 Given observation $y$, recover the clean object $x$ from which it came from. 
 Since the forward operator $A$ is typically destroys information (and is hence inverible), there can be several distinct clean objects which map to the same observation $y$ under the forward-operator $A$.
-Since we cannot recover $x$ exactly, our goal is instead to generate objects $x$ distributed according to p_data which are consistent with the given observation $y$. 
+Since we cannot recover $x$ exactly, our goal is instead to generate objects $x$ distributed according to $p_data$ which are consistent with the given observation $y$. 
 We can formalise this goal as sampling from the conditional distribution
 \[ p_\text{data}(x \mid y) = \frac{p(y \mid x)\,p_\text{data}(x)}{p(y)} \]
 Here we expanded the conditional distribution using Bayes' rule. 
@@ -413,8 +414,8 @@ We can now rewrite the posterior as
   p(x \mid y)  \;\propto\; p(x)\,\exp\!\Big(-\frac{\|y - A(x)\|^2}{2\sigma^2}\Big)
 \end{equation}
 
-Thus $x$ has high probability under the conditional distribution if both 1) it is consistent with the observation (i.e. $A(x)$ is close to $y$) and 2) it is a plausible object according to the data distribution, p_data. 
-The goal of inverse problem solving is given an observation $y$, to produce samples from $p_data(x \mid y)$, i.e. samples from p_data, which are consistent with the observation y. %there is some repetition here. we want to avoid this. 
+Thus $x$ has high probability under the conditional distribution if both 1) it is consistent with the observation (i.e. $A(x)$ is close to $y$) and 2) it is a plausible object according to the data distribution, $p_data$. 
+The goal of inverse problem solving is given an observation $y$, to produce samples from $p_data(x \mid y)$, i.e. samples from $p_data$, which are consistent with the observation y. %there is some repetition here. we want to avoid this. 
 
 \subsubsection{Relation to Reward Alignment}
 We now dicuss how inverse problem solving can be seen as a special case of reward alignment. 
@@ -472,11 +473,11 @@ Now because $f_\phi$ is a diffeomorphism, the change of variables formula~\ref{e
 \label{eq:likelihood_NF}
     p_\phi(x) = p_{\text{prior}}(f_\phi^{-1}(x)) \left| \det \frac{\partial f_\phi^{-1}(x)}{\partial x} \right|
 \end{equation}
-Or equivalently, (given formulation which evaluates f_phi rather than f^-1_phi)
+Or equivalently, (given formulation which evaluates $f_phi$ rather than $f^-1_phi$)
 
 Normalising flows therefore enables both 1) sampling of $p_\phi$ and 2) evaluation of its density. 
 These two operations require different computational requirements. Sampling requires being able to sample from the base distribution, and evaluating the forward direction of the learned map $f_\phi$. 
-Density evaluation (according to~\ref{eq:likelihood_NF}) requires computing the inverse direction of the learned map $f^{-1}_\phi$ and the determinant of the Jacobian of either f_phi or f^-1_phi, and the density of the base distribution. 
+Density evaluation (according to~\ref{eq:likelihood_NF}) requires computing the inverse direction of the learned map $f^{-1}_\phi$ and the determinant of the Jacobian of either $f_phi$ or $f^-1_phi$, and the density of the base distribution. 
 
 The predominant difficulty in density evaluation is the computation of the determinant of a $D \times D$ Jaccobian matrix $\frac{\partial f_\phi^{-1}(x)}{\partial x}$. 
 While we can always compute the Jacobian (and subsequently its deteminant) of a neural network with $D$ inputs and $D$ outputs using $D$ passes of either forward or reverse mode automatic differentiation, computing the determinant of a general $D \times D$ matrix costs $O(D^3)$ operations, which is very expensive.
@@ -484,7 +485,7 @@ While we can always compute the Jacobian (and subsequently its deteminant) of a 
 Much research has therefore gone into different ways to construct $f_phi$ so that its Jacobian has special structure which makes copmuting its determinant cheap. Of course, when constructing $f_phi$, we still must ensure that it is a diffeomorphism, and is flexible enough to transport our base distribution to the chosen target distribution. 
 
 \subsubsection{Constructing Normalising Flows}
-We have stated that $f_phi$ is parameterised by a neural network, however we require that $f_phi$ is invertible, which is not necessarily true of an arbitrary neural network. Furthermore, we would also like for the determinant of the Jacobian of $f_phi$ to be computed cheaply, while still ensuring that it f_phi is flexible enough to model the chosen target distribution. We now give an overview of the principles behind the state-of-the-art normalising flow architectures that ensure that $f_phi$ has these properties that we want. 
+We have stated that $f_phi$ is parameterised by a neural network, however we require that $f_phi$ is invertible, which is not necessarily true of an arbitrary neural network. Furthermore, we would also like for the determinant of the Jacobian of $f_phi$ to be computed cheaply, while still ensuring that it $f_phi$ is flexible enough to model the chosen target distribution. We now give an overview of the principles behind the state-of-the-art normalising flow architectures that ensure that $f_phi$ has these properties that we want. 
 
 The first principle is to break $f_\phi$ down into a composition of $L$ simpler invertible maps, which we typically refer to as layers.  
 $$ f_\phi = f_{L-1} \circ f_{L-2} \circ \dots \circ f_0$$
@@ -496,45 +497,45 @@ A sample from $p_\text{prior}$ is transported to a sample from $p_\phi$ by apply
 Importantly, the composition of invertible maps remains inverible, so we can still use the change of variables formula to evaluate the density of $p_\phi$. The Jacobian log determinant is given by
 (28 in NF survey)
 The advantage of this approach is that increasing $L$ results in only O(L) increase in operations required to compute the log determinant. 
-Now, if we strict the functional form of each map f_k so that its Jacobian has special structure which makes copmuting its determinant cheaply, then the overall map will have fairly cheap determinent, but the overall map will be quite expressive. %i think the logic of the argument can be made more clear here. 
+Now, if we strict the functional form of each map $f_k$ so that its Jacobian has special structure which makes copmuting its determinant cheaply, then the overall map will have fairly cheap determinent, but the overall map will be quite expressive. %i think the logic of the argument can be made more clear here. 
 
-We now discuss how to construct an individual f_k, which must of course be a diffeomorphism.  
-Recall that if we want cheap sampling, then we want f_k to be computed cheaply. 
-If we want cheap density evaluation at external points, we want f^-1_k and its Jacobian determinant to be computed cheaply.
+We now discuss how to construct an individual $f_k$, which must of course be a diffeomorphism.  
+Recall that if we want cheap sampling, then we want $f_k$ to be computed cheaply. 
+If we want cheap density evaluation at external points, we want $f^-1_k$ and its Jacobian determinant to be computed cheaply.
 This is important to keep in mind. 
-While there do exist several different overarching methods for constructing f_k to satisfy these properties, predominantly autoregressive flows, linear flows and residual flows, we focus on autoregressive flows as many state-of-the-art methods such as Glow and Tarflow are a variant of autoregressive flows. 
+While there do exist several different overarching methods for constructing $f_k$ to satisfy these properties, predominantly autoregressive flows, linear flows and residual flows, we focus on autoregressive flows as many state-of-the-art methods such as Glow and Tarflow are a variant of autoregressive flows. 
 
 % Furthermore, note that while some implementations use the neural network f_phi to parameterise the inverse direction of the flow, we parameterise the forward direction with f_phi ,without loss of generality. %we can probably omit this line. 
 
 To simplify notation, let us drop the layer index $k$ for a moment and consider a single layer mapping an input vector $z\in \mathbb{R}^D$ to an output vector $z' \in \mathbb{R}^D$. 
 In an autoregressive flow, we split the coordinates of z into K equal parts. 
 There are two main special cases, when K=D, we have fully autoregressive flows and when K=2, this is known as using 'coupling layers'.
-Let us denote these parts as z_1, ..., z_K. %not sure on the notation here
-We transform each part z_i, one at a time, from i=1 to K, in order to iteratively compute z' part by part. 
-The transformation of z_i is performed elementwise, and this transformation is a function only of parts z_1 , ..., z_{i-1}. 
+Let us denote these parts as $z_1$, ..., $z_K$. %not sure on the notation here
+We transform each part $z_i$, one at a time, from i=1 to K, in order to iteratively compute z' part by part. 
+The transformation of $z_i$ is performed elementwise, and this transformation is a function only of parts $z_1$ , ..., $z_{i-1}$. 
 In particular, 
-z_i' = tau(z_i, h_i), where h_i = c_i(z_<i)
-Here tau, which we call the transforme (not to be confused with transformer neural networks), is a transformation of z_i. 
-This parameters of this transformation, h_i, is computed by the i-th 'conditioner', which is typically implemented as a neural network, and only takes as input parts z_<i. 
-Importantly, to ensure that the autoregressive flow is invertible, we require that the transformer is invertible (assuming parameters h_i are known). This is achieved by ensuring the transformer is a strictly monotomic funciton of z_i. 
+$z_i'$ = tau($z_i, h_i$), where $h_i = c_i(z_<i)$
+Here tau, which we call the transforme (not to be confused with transformer neural networks), is a transformation of $z_i$. 
+This parameters of this transformation, $h_i$, is computed by the i-th 'conditioner', which is typically implemented as a neural network, and only takes as input parts $z_<i$. 
+Importantly, to ensure that the autoregressive flow is invertible, we require that the transformer is invertible (assuming parameters $h_i$ are known). This is achieved by ensuring the transformer is a strictly monotomic funciton of $z_i$. 
 However, we do not require that the conditioner is invertible. 
 
 To see why this construction is invertible, consider any z'. 
-We can prove by induction that we can compute each part z_i iteratively from i=1 to K. 
-We can compute z_1 as follows: h_1 can be computed automatically as it is not a function of any coordinates of z, then since we can invert the transformer when we have its parameters h_1, we can compute z_1. 
-Now let us assume we have computed z_1 , ... z_(i-1), then we can compute z_i as follows: compute h_i, which is a funciton of z_1 , ... z_(i-1), then invert the transformer. %make this argument more clear. 
+We can prove by induction that we can compute each part $z_i$ iteratively from i=1 to K. 
+We can compute $z_1$ as follows: $h_1$ can be computed automatically as it is not a function of any coordinates of z, then since we can invert the transformer when we have its parameters $h_1$, we can compute $z_1$. 
+Now let us assume we have computed $z_1$ , ... $z_(i-1)$, then we can compute $z_i$ as follows: compute $h_i$, which is a funciton of $z_1$ , ... $z_(i-1)$, then invert the transformer. %make this argument more clear. 
 
-Note that computing f_phi in the forward direction, each h_i (and thus each z’_i) can be computed in parallel since all conditioners take as input z coordinates, and we already have all z coordinates to hand. 
-However, to compute the inverse, we must compute each h_i one at a time from i=1,..K. Hence inverse computation is slower and more expensive than forward computation. 
-This is ultimately because the conditioner takes as input coordinates z_<i. 
-However, we can instead define it to take as input coordinates z’_<i. 
+Note that computing $f_phi$ in the forward direction, each $h_i$ (and thus each $z’_i$) can be computed in parallel since all conditioners take as input z coordinates, and we already have all z coordinates to hand. 
+However, to compute the inverse, we must compute each $h_i$ one at a time from i=1,..K. Hence inverse computation is slower and more expensive than forward computation. 
+This is ultimately because the conditioner takes as input coordinates $z_<i$. 
+However, we can instead define it to take as input coordinates $z’_<i$. 
 In this case, inverse evaluation is parallelisable while forward evaluation must be performed iteratively. 
-Which we choose depends on whether we want fast forward or inverse computation, which usually boils down to whether we want fast sampling of fast density evaluation of p_phi. 
-In the literature, taking as input coordinates z_<i is known as MAF, while taking as input z’_<i is known as IAF (or the other way around?)
+Which we choose depends on whether we want fast forward or inverse computation, which usually boils down to whether we want fast sampling of fast density evaluation of $p_phi$. 
+In the literature, taking as input coordinates $z_<i$ is known as MAF, while taking as input $z’_<i$ is known as IAF (or the other way around?)
 
 So we have shown that we can evalaute the inverse of autoregressive flows. 
 We now show that autoregressive flows have cheap Jacobian determinant. 
-In particular, since the j-th coodinate in each block z'_i_j, is computed as a transformation of z_i_j, and the parameters of the transformation are computed using only blocks z_<i, the partial derivative of z'_i_j with respect to coordinates of a larger index is 0. Hence Jacobian is lower triangular. %make notation clear here. 
+In particular, since the j-th coodinate in each block ${z'_i}_j$, is computed as a transformation of ${z_i}_j$, and the parameters of the transformation are computed using only blocks $z_<i$, the partial derivative of ${z'_i}_j$ with respect to coordinates of a larger index is 0. Hence Jacobian is lower triangular. %make notation clear here. 
 Because the determinant of any triangular matrix is simply the product of its diagonal entries, the log-determinant of the entire layer can be computed in $\mathcal{O}(D)$ time. 
 
 Now, previously, we stated that the transformer is an elementwise monotone function, and that the conditioner is typically implemented as a neural network.
@@ -542,8 +543,8 @@ However, there are several possible options for how exactly to implement both th
 Importantly, depending on the target distribution, we must ensure that both are sufficiently flexible enough to represent a map which transforms the base distribution to the target. 
 For the transformer, popular choices include implementing it as an affine transformation or a monotomic spline. We discuss affine transformation in more detail in the next section. 
 For the conditioner, in theory we could implement the i-th conditioner as its own separate neural network. 
-However, as previously discussed, since in forward direction, we can compute all h_i in paralel (assuming the conditioners take as input z i.e. MAF direction), it would be more ideal to have a single neural network which takes the entire z as input and outputs all of (h1, …, h_D) in one pass. 
-Such a network must be wired such that the output h_i cannot depend on inputs z_≥i 
+However, as previously discussed, since in forward direction, we can compute all $h_i$ in paralel (assuming the conditioners take as input z i.e. MAF direction), it would be more ideal to have a single neural network which takes the entire z as input and outputs all of (h1, …, $h_D$) in one pass. 
+Such a network must be wired such that the output $h_i$ cannot depend on inputs $z_≥i$ 
 There are may ways to do this, and this can be achieved for MLPs, CNNs, transformers. 
 
 Above, we have discussed a general recipe for constructing autoregressive flows. 
@@ -558,37 +559,37 @@ TarFlow is for learning a target distribution which is over images z'.
 And so z' corresponds to a flattened image. 
 Given this, what is a sensible way to break z down into blocks?
 Consider a CxHxW image where C is channels, H is height, W is width. 
-Split the H and W dimensions into a grid of PATCH_SIZE x PATCH_SIZE patches. 
-Each patch contains PATCH_SIZE*PATCH_SIZE*C numbers. 
-Now have a sequenec of K = (H/PATCH_SIZE)*(W/PATCH_SIZE) patches. 
-Each patch z_i is called a token. 
+Split the H and W dimensions into a grid of $PATCH_SIZE$ x $PATCH_SIZE$ patches. 
+Each patch contains $PATCH_SIZE*PATCH_SIZE*C$ numbers. 
+Now have a sequenec of K = ($H/PATCH_SIZE)*(W/PATCH_SIZE$) patches. 
+Each patch $z_i$ is called a token. 
 The ordering of tokens is a scan from top to bottom and left to right. 
 
 The next choice that TarFlow makes is the transformer. It chooses an affine transformer. 
 In particular, tau is an affine transformation
 
-z'_i = tau(z_i, h_i) = alpha_i * z_i + beta_i, where h_i = (alpha_i, beta_i)
+$z'_i$ = tau$(z_i, h_i) = alpha_i * z_i + beta_i$, where $h_i = (alpha_i, beta_i)$
 and * denotes element-wise product. 
 so within each token, each coordinate is transformed via its own affine map. 
 As previously discussed, Jacobian is triangular by construction. 
-Furthermore, the diagonal values of the jacobian are exactly the scale, log alpha_i. 
+Furthermore, the diagonal values of the jacobian are exactly the scale, log $alpha_i$. 
 
 For the conditioner, TarFlow natively chooses the MAF orientation. i.e. conditioner takes as input coordinates of z rather than z'. 
-Furthermore, for computational efficiency, TarFlow implements the conditioner as a neural network which can take all of z as input and output all of (h_1, ..., h_K) simultaneously. 
-And since the conditioner is such that h_i is only a function of z_<i, we can use this same neural network to compute h_i iteratively in the case where we have z' instead of z (i.e. in inverse evaluation). 
+Furthermore, for computational efficiency, TarFlow implements the conditioner as a neural network which can take all of z as input and output all of ($h_1$, ..., $h_K$) simultaneously. 
+And since the conditioner is such that $h_i$ is only a function of $z_<i$, we can use this same neural network to compute $h_i$ iteratively in the case where we have z' instead of z (i.e. in inverse evaluation). 
 So, what neural network does TarFlow choose as the conditoner?
 It chooses a transformer neural network. 
-This transformer network projects each token (of dimension PATCH_SIZE*PATCH_SIZE*C) to dimension CH. 
+This transformer network projects each token (of dimension $PATCH_SIZE*PATCH_SIZE*C$) to dimension CH. 
 It then adds learned positional embeddings to each projected token. 
 It then runs LPB transformer layers with a causal mask (token iattends only to tokens ≤i). 
-Finally, each token's hidden state is mapped to the parameters corresponding to alpha_i, beta_i
+Finally, each token's hidden state is mapped to the parameters corresponding to $alpha_i, beta_i$
 Importantly, outputs are shifted by one token - this is so the parameters applied to token i are computed from tokens strictly before it, and token 0 gets (0,0)
 
 Let's zoom into the transformer layer. 
 Each transformer layer consists of a multi-headed atttention layer, followed by MLP. 
 this is just standard attention: for each position, we compute keys, queries and values, take dot product between keys and queries to compute scores, set scores for which query index ≥ key index to -infty, then for each query, take softmax across scores for that query, to get final atttention scores, add linear combination of value vectors to each position, where weights of linear combination are determined by the attention scores.  
 
-We just now discussed a single autoregressive layer f_k. TarFlow uses num_blocks layers. This is a hyperparameter. 
+We just now discussed a single autoregressive layer $f_k$. TarFlow uses $num_blocks$ layers. This is a hyperparameter. 
 Furthermore, between each layer, we reverse token ordering. 
 in first layer, the first block/token is not conditioned on any other subsequent tokens. 
 but in the next layer, this same token is now conditioned on ALL tokens.
@@ -599,9 +600,9 @@ It is fairly intuitive that permutation operation is invertible, and it is easy 
 
 Everything we have discussed so far is the architecture of TarFlow. 
 We now discuss a non-architectural trick that TarFlow uses to aid training the normalising flow to match an target distribution over images. 
-Note that real images occupy a 'thin' sliver of R^D i.e. a manifold
+Note that real images occupy a 'thin' sliver of $R^D$ i.e. a manifold
 remember that a flow is a smooth bijection with smooth inverse. 
-the base distribution is standard normal (which is spread evenly across R^D with no thin regions)
+the base distribution is standard normal (which is spread evenly across $R^D$ with no thin regions)
 learning a bijection from a standard normal to a very thin manifold is difficult
 that map must compress enormously in directions perpendicular to the surface.
 this means that the Jacobian of the map must be very large and negative
@@ -720,51 +721,51 @@ While the flow matching algorithm itself is very simple, its derivation is fairl
 We give an overview of the logical construction of the derivation here. 
 
 % there is some repetition here. integrate first two paragraphs
-To summarise this logical construction, recall our goal requires desired ODE trajectory fulfills X1 sim p_init, X0 sim p_target
-The goal does not restrict how the intermediate trajectory points X_t are distributed
-In flow matching, we explicitly construct a continuous sequence of distributions, called a probability path, X_t ~ p_t, which interpolates between p_1 = p_base at t=1, and p_0 = p_target at t=0. 
-Given that we have explicitly constructed a probability path, we can construct a vector field which precisely follows, the constructed probability path X_t sim p_t across time. This vector field is called the marginal vector field. 
+To summarise this logical construction, recall our goal requires desired ODE trajectory fulfills X1 sim $p_init$, X0 sim $p_target$
+The goal does not restrict how the intermediate trajectory points $X_t$ are distributed
+In flow matching, we explicitly construct a continuous sequence of distributions, called a probability path, $X_t$ ~ $p_t$, which interpolates between $p_1 = p_base$ at t=1, and $p_0 = p_target$ at t=0. 
+Given that we have explicitly constructed a probability path, we can construct a vector field which precisely follows, the constructed probability path $X_t$ sim $p_t$ across time. This vector field is called the marginal vector field. 
 Once constructing the marginal vector field, we derive a training objective which enables the neural network to match it. 
 We now begin by constructing this marginal vector field from the ground up, starting with the definition of a conditional probability path. 
 
-for a given target sample z sim p_target, a condiitonal probability path is sequence of conditional distributions (conditioned on z) defined such that the start distribution is p_base, and the end distribution is a dirac at the target sample z. 
+for a given target sample z sim $p_target$, a condiitonal probability path is sequence of conditional distributions (conditioned on z) defined such that the start distribution is $p_base$, and the end distribution is a dirac at the target sample z. 
 
 Note that there are many possible choices which can satisfy the definition of a conditional probability path. We discuss a popular chocie at the end of this section. 
 
 if we marginalise over a conditional probability path, we get the marginal probability path. 
 we obtain the density for marginal probability path using sum rule and product rule. 
 
-while the density is intractable as it involves computing an integral over all possible z in R^D, we can sample from a marginal probability path, as long as it is possible to sample from the conditional probability path. 
-in particular, to sample from p_t, we first sample z (a data point), and then we sample from p_t ( | z). 
+while the density is intractable as it involves computing an integral over all possible z in $R^D$, we can sample from a marginal probability path, as long as it is possible to sample from the conditional probability path. 
+in particular, to sample from $p_t$, we first sample z (a data point), and then we sample from $p_t$ ( | z). 
 
 % ambiguities at this point: 1) we haven't yet specified what the conditional probability path is exactly (omly its start and end point distributions), and subsequently the reader does not know that we can sample from the conditional probability path in order to then sample from the marginal one. i guess we need to make it clear that we can literally choose any conditional probability path, as long as it satisfies the definition. 
 
 importantly, it can be proved that the marginal probability path interpolates between base distribution and the target distribution. 
 
-We can now specify the goal of flow matching more precisely. We want to learn a vector field such that, for each time t in [0,1], the point along the trajectory X_t is distributed according to the probability path p_t. 
+We can now specify the goal of flow matching more precisely. We want to learn a vector field such that, for each time t in [0,1], the point along the trajectory $X_t$ is distributed according to the probability path $p_t$. 
 
 We now explicitly construct exactly such a vector field (called the marginal vector field), which is the target vector field that flow matching aims to learn. 
 
 We must first define the conditional vector field. 
-For any given sample z from the target distribution,and given a particular conditional probability path, the conditional vector field u_t^target( | z) must be such that if a trajectory X_t satisfies the ODE defined by conditional vector field, 
-X_1 sim p_base , d/dt X_t = u_t(X_t | z)
-then that trajectory is distributed according to the conditional probability path, i.e. X_t sim p_t( | z). 
+For any given sample z from the target distribution,and given a particular conditional probability path, the conditional vector field $u_t^target$( | z) must be such that if a trajectory $X_t$ satisfies the ODE defined by conditional vector field, 
+$X_1$ sim $p_base$ , d/dt $X_t = u_t(X_t | z)$
+then that trajectory is distributed according to the conditional probability path, i.e. $X_t$ sim $p_t$( | z). 
 For many conditional probability paths, it is often possible to find a conditional vector field analytically. 
 We are now ready to define the marginal vector field. 
-Let u_t( | z) be a conditional vector field. Then the marginal vector field is defined as ... (18)
+Let $u_t$( | z) be a conditional vector field. Then the marginal vector field is defined as ... (18)
 We give some intuition for equation 18. 
-Equation 18 computes u_t(x) as a weighted average of u_t(x | z), over all possible target samples z, where the weights of this weighted average are determined by a posterior .... 
+Equation 18 computes $u_t$(x) as a weighted average of $u_t$(x | z), over all possible target samples z, where the weights of this weighted average are determined by a posterior .... 
 This posterior describes how much we believe that x came from that particular z. 
 
 It can be proven that the marginal vector field follows the marginal probability path. More precisely, 
-If X_0 sim p_base and d/dt X_t = u_t(X_t) then the trajectory X_t is distributed according to the marginal probability path (for t in [0,1]). 
-Most importantly, by construction, X_1 is distrubuted according to p_target. 
+If $X_0$ sim $p_base$ and d/dt $X_t = u_t(X_t)$ then the trajectory $X_t$ is distributed according to the marginal probability path (for t in [0,1]). 
+Most importantly, by construction, $X_1$ is distrubuted according to $p_target$. 
 We do not prove this result here, and refer readers to the MIT notes. 
 
-So now we can specify the goal of flow matching further. We want to train the neural network u_t^theta such that is equals precisely the marginal vector field. 
+So now we can specify the goal of flow matching further. We want to train the neural network $u_t^theta$ such that is equals precisely the marginal vector field. 
 One idea is to simply regress the output of the neural network directly against the marginal vector field. In particular we want to minimise the following flow matching loss, defined as 
 (24 and 25)
-In 24 we take the expectation over the marginal probability path p_t. However in practice, we sample from the marginal probability path by first sampling the target sample z, and then sampling the conditional probability path, hene in 25, we rewrite the expectation over this sampling procedure. 
+In 24 we take the expectation over the marginal probability path $p_t$. However in practice, we sample from the marginal probability path by first sampling the target sample z, and then sampling the conditional probability path, hene in 25, we rewrite the expectation over this sampling procedure. 
 Unfortunately, we cannot evaluate this loss because the marginal vector field is intractable. 
 
 However, the conditional vector field is tractable as we can derive an analytical formula for it, and so we instead regress against this
@@ -776,39 +777,39 @@ So we have learned that flow matching training consists of learning the marginal
 We give a concrete example of a very simple conditional probability path and use it to derive a conditional vector field and subsequently a corresponding conditional flow matching loss. 
 This conditional probability path, called the the CondOT probability path is used to train state-of-the-art flow models, and is the basis for the training objectives uses to train the generative models used in our project. 
 The CondOT probability path is defined as pt(x|z) = N(tz,(1−t)2), oten referred to as the CondOT probability path (make sure it satisfies the time convention). 
-Clearly it satisdies the definition of a conditional probability path since at t=1, p_1( | z) is distributed according to standard normal and at t=0, it is distributed according to a dirac at z. 
+Clearly it satisdies the definition of a conditional probability path since at t=1, $p_1$( | z) is distributed according to standard normal and at t=0, it is distributed according to a dirac at z. 
 While there are many possible conditional vector fields, we can prove that one such vector field is given by 
 (29)
 Plugging this into the conditional flow matching loss yeilds
 (30)
-Finally, noting that we can write any x sim p_t( | z) as x = tz + (1-t)e, where e sim N(0,I), we can take the expectation over standard normal to give (31). 
+Finally, noting that we can write any x sim $p_t$( | z) as x = tz + (1-t)e, where e sim N(0,I), we can take the expectation over standard normal to give (31). 
 
 For the CondOT conditional probability path, we now summarise the flow matching training algorithm. 
 We sample a target from the dataset, we noise that target, tz + (t-1)e, (this is a linear interpolation between noise and data), and we simply regress the velocity network evaluated at the noised point against (z-e), which is simply the difference between noise and data. We are effectively regressing against a straight line. 
 
 \subsection{Flow Maps}
-When sampling from a flow model, we start at random noise X_1 sim p_base, and simulate the trajectory X_t (from t=1 to t=0) by taking small steps in the direction output by the velocity network, u_t(X_t).
+When sampling from a flow model, we start at random noise $X_1$ sim $p_base$, and simulate the trajectory $X_t$ (from t=1 to t=0) by taking small steps in the direction output by the velocity network, $u_t(X_t)$.
 Often a large number of steps are required to simulate trajectories accurately. 
-Since each step requires evaluating the velocity network at the current location along the trajectory, u_t(X_t), sampling from a flow model is very expensive. 
+Since each step requires evaluating the velocity network at the current location along the trajectory, $u_t(X_t)$, sampling from a flow model is very expensive. 
 
 The displacement resulting from following the vector field v from t=s to t=t (for any s and t, and taking an infinite number of infinitesimally small steps) is exactly an integral of v
 $$\int_s^t v(\mathbf{x}_\tau, \tau) \mathrm{d}\tau$$
-By taking small steps in the direction output by u_t(X_t) (as in Euler's method)'s we are effectively approximating this integral. 
+By taking small steps in the direction output by $u_t(X_t)$ (as in Euler's method)'s we are effectively approximating this integral. 
 This motivates, rather than training a neural network to learn the marginal vector field, we can instead train it to learn the integral of the marginal vector field directly. In particular, we want to learn a flow map, which we denote as 
         \begin{equation}
         \label{eq:flow_integral}
         F(\mathbf{x}_s, s, t) = \mathbf{x}_s + \int_s^t v(\mathbf{x}_\tau, \tau) \mathrm{d}\tau.
         \end{equation}
 Given a source time s, location on a trajectory at that time s, and a target time t, a flow map outputs the location on that same trajectory at time t. 
-Hence assuming that we have successfuly trained a neural network to predict the flow map, we can sample X_1, and samply evaluate F(X_1, 1, 0) in order to obtain the sample X_0 at t=1. Hence sampling from a flow model only requires one forward pass of a neural network. 
+Hence assuming that we have successfuly trained a neural network to predict the flow map, we can sample $X_1$, and samply evaluate F($X_1$, 1, 0) in order to obtain the sample $X_0$ at t=1. Hence sampling from a flow model only requires one forward pass of a neural network. 
 
 We now take some time to covince ourselves that a flow map is indeed a well-defined function.  
-Since we ask the flow map to take as input a source time s, and location on a trajectory at that time s, and correspondingly output the the location on that same trajectory at time t, we implicitly assume that 1) there is only one such trajectory such that at time s, we are at location x_s so that there is no ambiguity regarding which trajectory we are on, (in other words, a location and time uniquely specifies a trajectory) and 2) that following the velocity field from x_s for duration t-s deterministicaly leads to a single location x_t, so that the flow map always has a single valid output. 
+Since we ask the flow map to take as input a source time s, and location on a trajectory at that time s, and correspondingly output the the location on that same trajectory at time t, we implicitly assume that 1) there is only one such trajectory such that at time s, we are at location $x_s$ so that there is no ambiguity regarding which trajectory we are on, (in other words, a location and time uniquely specifies a trajectory) and 2) that following the velocity field from $x_s$ for duration t-s deterministicaly leads to a single location $x_t$, so that the flow map always has a single valid output. 
 
-To understand why points 1 and 2 are true, recall that trajectories are ultimately specified by the learned vector field. In particular, if we sample a start point X_1, and follow the vector field, until t=0, we obtain a trajectory. 
-Suppose 1) was not true, and that there are multiple distinct trajectories such that at time s, they have the same location x_s. In this case, at x_s, the location where all trajectories separate from each other, there are mutiple valid velocities. (I guess the only ambiguity is if all trajectories match up until x_s, at which point they diverge after s, or the opposite case if they diverge before s. I am confused here, since velocity network outputs direction assuming we are going forward in time. if trajectories start at different positions at t=0, and coverge at x_s, then we still have one valid velocity only, so this is fine? it is only if we go backwards in time that we have a problem?) However, the marginal vector field can only produce a single deterministic velocity, and so we have a contradiction. 
-Note that for point 2, since we deterministically follow the marginal vector field, starting from x_s, we can only ever end up at one location x_t.  
-As a side note, a concequence of this reasoning is that the marginal vector field defines a bijection between noise samples X_1 and target samples X_0, each pair connected by a unique trajectory.  
+To understand why points 1 and 2 are true, recall that trajectories are ultimately specified by the learned vector field. In particular, if we sample a start point $X_1$, and follow the vector field, until t=0, we obtain a trajectory. 
+Suppose 1) was not true, and that there are multiple distinct trajectories such that at time s, they have the same location $x_s$. In this case, at $x_s$, the location where all trajectories separate from each other, there are mutiple valid velocities. (I guess the only ambiguity is if all trajectories match up until $x_s$, at which point they diverge after s, or the opposite case if they diverge before s. I am confused here, since velocity network outputs direction assuming we are going forward in time. if trajectories start at different positions at t=0, and coverge at $x_s$, then we still have one valid velocity only, so this is fine? it is only if we go backwards in time that we have a problem?) However, the marginal vector field can only produce a single deterministic velocity, and so we have a contradiction. 
+Note that for point 2, since we deterministically follow the marginal vector field, starting from $x_s$, we can only ever end up at one location $x_t$.  
+As a side note, a concequence of this reasoning is that the marginal vector field defines a bijection between noise samples $X_1$ and target samples $X_0$, each pair connected by a unique trajectory.  
 Contrast this with diffusion models, which have a stochastic sampling procedure rather than deterministic, and so does not define such a bijection. 
 Flow maps are therefore an object which strictly relate to flow models, and not diffusion models. 
 
@@ -818,7 +819,7 @@ Many different algorithms have been proposed to train flow maps, and we refer re
 
 The MeanFlow algorithm is derived from a simple intuitive rule which any valid flow map must satisfy.  
 Given any flow map, consider the instantaneous change in the output of $F(\mathbf{x}_s, s, t)$ as we change the time of the current location, $s$. 
-Intuitively, changing the current time on a given trajectory, will have no effect on the location at time $t$ on the trajectory. In particular, for every valid x_s, s and t (assuming a CondOT probability path, valid x_s means it is a sample from the marginal probability path, p_s?), the following must hold 
+Intuitively, changing the current time on a given trajectory, will have no effect on the location at time $t$ on the trajectory. In particular, for every valid $x_s$, s and t (assuming a CondOT probability path, valid $x_s$ means it is a sample from the marginal probability path, $p_s$?), the following must hold 
     $$\frac{\mathrm{d}}{\mathrm{d}s} F(\mathbf{x}_s, s, t) = 0$$. 
 This is the Eulerian consistency rule. 
 While this rule seems trivial, it can be proven that any function which adheres to the Eulerian consistency rule is a valid flow map.
@@ -829,13 +830,13 @@ Since $s$ affects two inputs of $F$, we can expand the equation using via chain 
 \label{eq:eularian_consistency_eq}
     \frac{\mathrm{d}}{\mathrm{d}s} F(\mathbf{x}_s, s, t) = \nabla_{\mathbf{x}_s} F(\mathbf{x}_s, s, t) \frac{\mathrm{d}\mathbf{x}_s}{\mathrm{d}s} + \frac{\partial}{\partial s} F(\mathbf{x}_s, s, t) = 0
 \end{equation}
-If we use a loss function, which is simply the magnitude of the left hand side (in practice we take the square of the left hand side), and averaged over all x_s, s and t (?), the neural network parameterising F which minimises this loss function perfectly to 0 must satisfy the Eulerian consistency rule.  
+If we use a loss function, which is simply the magnitude of the left hand side (in practice we take the square of the left hand side), and averaged over all $x_s$, s and t (?), the neural network parameterising F which minimises this loss function perfectly to 0 must satisfy the Eulerian consistency rule.  
 
 \begin{equation}
 \label{eq:basic_eulerian_loss}
     \mathcal{L}_{\text{Eulerian}} = \mathbb{E} \left[ \left( \frac{\partial}{\partial s} F(\mathbf{x}_s, s, t) + \nabla_{\mathbf{x}_s} F(\mathbf{x}_s, s, t) \frac{\mathrm{d}\mathbf{x}_s}{\mathrm{d}s}  \right)^2 \right]
 \end{equation}
-Here the expectation is taken over x_s, s and t, where s and t are distributed according to uniform[0,1], and x_s is distributed according to marginal probability path p_s(z)? and we can sample from marginal probability path by sampling a data point z, then sampling from the conditional probability p_s( | z)?
+Here the expectation is taken over $x_s$, s and t, where s and t are distributed according to uniform[0,1], and $x_s$ is distributed according to marginal probability path $p_s$(z)? and we can sample from marginal probability path by sampling a data point z, then sampling from the conditional probability $p_s$( | z)?
 
 In practice, can we evaluate all the terms in this loss function?
 We note that $\frac{\mathrm{d}\mathbf{x}_s}{\mathrm{d}s} = v(\mathbf{x}_s, s)$. 
@@ -845,7 +846,7 @@ However, we will soon discuss how the MeanFlow algorithm avoids this, and instea
 
 For the remaining terms in the loss, we see that they are derivative of exactly the function, $F$, that we are trying to learn. Because $F$ is parameterised by a neural network, we can indeed compute these derivatives of $F$ using backpropagation. However, when optimising the loss function using gradient descent, we must then compute higher order derivatives of the neural network parameterising F. This can be expensive. Fortunately, there are a couple tricks that MeanFlow uses to avoid this, which we now show. 
 
-First, note that rather that parameterising a flow map F(x_s, s, t) to directly predict the location x_t on the trajectory specified by x_s and s, we can equivalently parameterise the flow map to predict the average velocity (or mean flow) between points x_s and x_t on the trajectory 
+First, note that rather that parameterising a flow map F($x_s$, s, t) to directly predict the location $x_t$ on the trajectory specified by $x_s$ and s, we can equivalently parameterise the flow map to predict the average velocity (or mean flow) between points $x_s$ and $x_t$ on the trajectory 
 $$V(\mathbf{x}_s, s, t) = \frac{1}{t - s} \int_s^t v(\mathbf{x}_\tau, \tau) \, \mathrm{d}\tau,$$
 We say that these are equivalent parameterisations of a flow map because we can recover the output of one parameterisation from the other via the following equality
 $$F(\mathbf{x}_s, s, t) = \mathbf{x}_s + (t - s) V(\mathbf{x}_s, s, t)$$
@@ -879,7 +880,7 @@ Otherwise, the target is constantly moving as V is updated.
 Now we have tackled the problem of avoiding computing higher order derivatives when optimising the loss function, we return to the problem of needing to evaluate the marginal vector field, v, in order to compute the loss function. 
 To avoid requiring a pre-trained flow model to provide these velocities, MeanFlow uses the exact same marginalisation trick used to derive the training objective for flow matching. (Is this definitely the marginalisation trick? I thought the marginalisation trick states that marginal vector field follows the marginal probability path? but the result here states we can replace marginal vector field with conditional vector field in the loss. this is theorem 12 in the MIT notes?)
 
-In particular, we can simply replace the marginal vector field, v, in the trianing objective with the conditional vector field. When using the CondOT conditional probability path, the conditional vector field p_t ( | x0) is exactly e - x0 (for e sampled from standard normal). 
+In particular, we can simply replace the marginal vector field, v, in the trianing objective with the conditional vector field. When using the CondOT conditional probability path, the conditional vector field $p_t$ ( | x0) is exactly e - x0 (for e sampled from standard normal). 
 Hence the trianing objective becomes 
 \begin{equation}
 \label{eq:MeanFlow_conditional}
@@ -889,9 +890,9 @@ Hence the trianing objective becomes
 The gradient of this loss function is exactly the gradient of of~\ref{eq:MeanFlow_marginal}, and they also have the same minimiser. We do not prove this result here. However, we note that the proof only works because of the design choices that MeanFlow makes. In particular, using mean squared error as the loss, the fact that we have used the the Eulerian consistency rule (rather than alternative consistency rules) and the fact that we used the stop-gradient operation. The stop gradient thus both avoids higher-order differentiation and also allows us to use the marginalisation trick (again is this the marginalisation trick? maybe best to call it marginal from conditional learning). 
 
 \section{Variational Inference}
-We have now discussed various unconditional flow-based generative models which enable sampling from a data distribution p_data. 
+We have now discussed various unconditional flow-based generative models which enable sampling from a data distribution $p_data$. 
 Recall that our ultimate goal is inverse problem solving. 
-In partcular, for a given observation y, we wish to sample from the posterior p_data(x | y). 
+In partcular, for a given observation y, we wish to sample from the posterior $p_data$(x | y). 
 Our project seeks to tackle this by extending the approach taken by variational flow maps.
 The approach taken by variational flow maps is based on variational inference.
 Hence this section provides an overview of the problem that variational inference aims to solve and the approach that variational inference takes to solve it.
@@ -907,7 +908,7 @@ We therefore now make this bayesian posterior inference problem precise, and dis
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.7\linewidth]{graphical_model.PNG}
+    % \includegraphics[width=0.7\linewidth]{graphical_model.PNG}  % file missing from repo
     \caption{Left: Graphical model with unknown stochastic latent variables $z$, observed variables $x$, and deterministic parameters $\theta$. Right: Graphical model with stochastic per-datapoint local latent variables $z_n$, observed variables $x_n$, and deterministic global parameters $\theta$. }
     \label{fig:graphical_model_VI}
 \end{figure}
@@ -966,63 +967,63 @@ We sum the per-datapoint ELBOs to obtain the following overall objective functio
 \end{equation}
 
 \subsection{Stochastic VI}
-To avoid computing the loss function over the entire dataset x_n from n=1,..,N, we can compute an unbiased estimate of this by drawing a random batch $\mathcal{B}$ of $B$ datapoints from the dataset $\mathcal{D}$ and computing  
+To avoid computing the loss function over the entire dataset $x_n$ from n=1,..,N, we can compute an unbiased estimate of this by drawing a random batch $\mathcal{B}$ of $B$ datapoints from the dataset $\mathcal{D}$ and computing  
 \dots %Give equation 
 We must scale by $N/B$ since dividing by $B$ gives the ‘average’ ELBO for a particular datapoint, and we subsequently multiply by N, to get the estimate for the sum over the full dataset. 
 
 \section{Variational Flow Maps}
 Recall that our goal is to solve inverse problems with flow maps. 
 This project extends the approach taken by Variational Flow maps. 
-Given a pre-trained unconditional flow map that can generate samples from p_data(x), VFM is a method which fine tunes this flow map and trains a 'noise adapter' to enable sampling from p_data tilted by an arbitrary reward, such as a conditional distribution p_data(x | y). 
+Given a pre-trained unconditional flow map that can generate samples from $p_data$(x), VFM is a method which fine tunes this flow map and trains a 'noise adapter' to enable sampling from $p_data$ tilted by an arbitrary reward, such as a conditional distribution $p_data$(x | y). 
 We are now in a position to understand exactly the method that VFM takes to achieve this. 
 We first discuss VFM applied to the inverse problem setting, before generalising to general reward alignment. 
 
-Say we have already trained a flow map which can generate samples from p_theta(x), which closely approximates p)data(x). 
-Now, in inverse problem solving, assuming a particular forward problem, given an observation y, we now wish to sample from p_data(x | y). 
+Say we have already trained a flow map which can generate samples from $p_theta$(x), which closely approximates p)data(x). 
+Now, in inverse problem solving, assuming a particular forward problem, given an observation y, we now wish to sample from $p_data$(x | y). 
 i.e. samples from the data distribution, which are consistent with observation y.
-Now assuming we have perfectly trained our flow map, so that p_theta matches p_data perfectly, we can equivalently state the problem as seeking to sample from p_theta(x | y). 
+Now assuming we have perfectly trained our flow map, so that $p_theta$ matches $p_data$ perfectly, we can equivalently state the problem as seeking to sample from $p_theta$(x | y). 
 
 Now, recall we previously discussed that a flow map (or equivalently the marginal vector field) induces a bijection between samples from the base distribution and samples from the target distribution. 
 In particular, it can be proved that F(, 1, 0) is a differomorphism between noise and data samples. 
-Hence the change of variables formula tells us that applying F^-1 to the distribution p_theta(x | y) gives us a well-defined distribution in noise space p_theta(z | y). 
+Hence the change of variables formula tells us that applying $F^-1$ to the distribution $p_theta$(x | y) gives us a well-defined distribution in noise space $p_theta$(z | y). 
 
-If we can learn to sammple from the distribution, p_theta(z | y), these samples can be decoded by the flow map to produce samples from the distribution that we care about p_theta(x | y). This is exacly the goal of VFM. In words, VFM aims to sample from p_theta(x | y) by instead learning to sample noise which decode to samples from p_theta(x | y) via the flow map. 
+If we can learn to sammple from the distribution, $p_theta$(z | y), these samples can be decoded by the flow map to produce samples from the distribution that we care about $p_theta$(x | y). This is exacly the goal of VFM. In words, VFM aims to sample from $p_theta$(x | y) by instead learning to sample noise which decode to samples from $p_theta$(x | y) via the flow map. 
 
-How do we know that such noise that decodes onto samples from p_theta(x | y) exists? 
-Well, samples from p_theta(x | y) are simply samples from the data distribution p_theta(x) with the additional restriction that they are also consistent with the observation y. 
-Hence p_theta(x | y) simply reweights the mass on the data manifold. 
-Now because the flow map is a diffeomorphism, we can derive a distribution over noise space, p_theta(z | y), which when transformed by the flow map, is exactly p_theta(x | y). 
-i.e. given random variable Z distributed according to p_theta(z | y), f(Z) is distributed according to p_theta(x | y). 
+How do we know that such noise that decodes onto samples from $p_theta$(x | y) exists? 
+Well, samples from $p_theta$(x | y) are simply samples from the data distribution $p_theta$(x) with the additional restriction that they are also consistent with the observation y. 
+Hence $p_theta$(x | y) simply reweights the mass on the data manifold. 
+Now because the flow map is a diffeomorphism, we can derive a distribution over noise space, $p_theta$(z | y), which when transformed by the flow map, is exactly $p_theta$(x | y). 
+i.e. given random variable Z distributed according to $p_theta$(z | y), f(Z) is distributed according to $p_theta$(x | y). 
 %clean this up, there is some repetition here. 
 
-Goal of VFM is to sample from this posterior, p_theta(z | y).
+Goal of VFM is to sample from this posterior, $p_theta$(z | y).
 \begin{equation}
 \label{eq:normalising_constant}
     \widetilde p^{\text{tilt}}_{\text{noise}}(z \mid y) \propto p(z)\,\exp\!\Big(-\frac{\|y - A(f_\theta(z))\|^2}{2\sigma^2}\Big), \qquad p(z) = \mathcal{N}(0,I)
 \end{equation}
 Sice can evaluate the density of this posterior up to a normalising constant, variational inference is the natural solution. Recall that variational inference seeks to approximate a distribution, which we can evaluate up to a normalising constant, with a variational distirbution that we can sample from. 
-Furthermore, note that sampling from the posterior p_theta(z | y) is exactly a bayesian posterior inference problem. Hence we can apply the derivations from the previous section directly to this setting. 
-In particular, let us say that we have a finite universe of N possible observations. In reality, N is infinite, or at least very large. Let us say for any observation y_n, for n in 1,...,N, we want to know p_theta(z_n | y_n).
-Now p_theta(z_n| y_n) is the posterior of the graphical model in figure~\ref{fig:graphical_model_simple_VFM}
+Furthermore, note that sampling from the posterior $p_theta$(z | y) is exactly a bayesian posterior inference problem. Hence we can apply the derivations from the previous section directly to this setting. 
+In particular, let us say that we have a finite universe of N possible observations. In reality, N is infinite, or at least very large. Let us say for any observation $y_n$, for n in 1,...,N, we want to know $p_theta(z_n | y_n)$.
+Now $p_theta(z_n| y_n)$ is the posterior of the graphical model in figure~\ref{fig:graphical_model_simple_VFM}
 %not sure how to do the integration here...
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.4\linewidth]{VFM_simple_model.PNG}
+    % \includegraphics[width=0.4\linewidth]{VFM_simple_model.PNG}  % file missing from repo
     \caption{Enter Caption}
     \label{fig:graphical_model_simple_VFM}
 \end{figure}
-The graphical model describes the underlying process by which we assume the data y_n (corresponding to observations) is generated. 
-we assume that for a given observation y_n (observed variable), there is an underlying hidden latent z_n, together with the flow map parameterised by theta, which produces it 
-In particular, we assume y_n = A*f_theta(z_n) + e. 
+The graphical model describes the underlying process by which we assume the data $y_n$ (corresponding to observations) is generated. 
+we assume that for a given observation $y_n$ (observed variable), there is an underlying hidden latent $z_n$, together with the flow map parameterised by theta, which produces it 
+In particular, we assume $y_n = A*f_theta(z_n)$ + e. 
 The flow map parameters, theta, capture the process by which data is generated. 
-Note that since A*f_theta(z_n) is a deterministic function of z_n, we ignore it in the graphical model, and do not include a node for it. 
+Note that since $A*f_theta(z_n)$ is a deterministic function of $z_n$, we ignore it in the graphical model, and do not include a node for it. 
 %the logic here can be made more clear. 
 
 This graphical model is exactly the same as which we saw in the previous section (and is also the graphical model that a VAE assumes). 
-Hence, we can use variational inference to learn for each p_theta(z_n| y_n), a variational distirbution q_phi_n(z_n) approximating it. 
-In fact, to avoid optimising the variational parameters phi_n for each new observation y_n, we can use amortised variational inference. 
-In particular, we can learn a single shared neural network, g_phi, which outputs the variational parameters phi_n, for each observation y_n.  
+Hence, we can use variational inference to learn for each $p_theta(z_n| y_n)$, a variational distirbution $q_phi_n(z_n)$ approximating it. 
+In fact, to avoid optimising the variational parameters $phi_n$ for each new observation $y_n$, we can use amortised variational inference. 
+In particular, we can learn a single shared neural network, $g_phi$, which outputs the variational parameters $phi_n$, for each observation $y_n$.  
 We can use exactly the same training objective that we previously derived (but with observed variables $x_n$ relabelled as $y_n$.)
 \begin{align}
 \tilde{\mathcal{L}}(\theta, \phi \mid \mathcal{D}) &= \sum_{n=1}^N \left[ \mathbb{E}_{q_\phi(z_n \mid y_n)} [\log p_\theta(y_n, z_n) - \log q_\phi(z_n \mid y_n)] \right] \label{eq:VFM_simple_ELBO} \\
@@ -1036,18 +1037,18 @@ The tractable family of distributions that the variational distribution $q_\phi(
 
 VFM choose a simple diagonal Gaussian. 
 For a diagonal Gaussian, we can safely compute~\ref{eq:VFM_simple_ELBO_massaged}.. 
-In particular, we can sample from it (so that we can estimate the expectation), and we can also analytically evaluate the KL divergence to p_theta(z_n) because this prior too is a gaussian. 
+In particular, we can sample from it (so that we can estimate the expectation), and we can also analytically evaluate the KL divergence to $p_theta(z_n)$ because this prior too is a gaussian. 
 
-Given an observation y_n, the shared network g_phi outputs both the mean and diagonal values of the covariance matrix of the corresponding variational posterior $q_\phi(z_n\mid y_n)$.
+Given an observation $y_n$, the shared network $g_phi$ outputs both the mean and diagonal values of the covariance matrix of the corresponding variational posterior $q_\phi(z_n\mid y_n)$.
 $$g_\phi(y) = \big(\mu_\phi(y), \sigma_\phi^2(y)\big), \qquad q_\phi(z|y) = \mathcal{N}\big(z \mid \mu_\phi(y), \mathrm{diag}(\sigma_\phi^2(y))\big)$$
 This neural network is what the authors of VFM call the 'noise adapter' (and is otherwise known as an encoder, in the context of a VAE). 
 
 \subsection{Joint training of noise adapter and flow map}
-In practice, a simple diagonal gaussian is not expressive enough to approximate the true posterior p_theta(z | y) accurately. 
-The authors of VFM theoretically prove that expectation of decoded samples over gaussian noise adapter distribution is not equal to expectation of the true posterior p_data(x | y). 
+In practice, a simple diagonal gaussian is not expressive enough to approximate the true posterior $p_theta$(z | y) accurately. 
+The authors of VFM theoretically prove that expectation of decoded samples over gaussian noise adapter distribution is not equal to expectation of the true posterior $p_data$(x | y). 
 Furthermore, authors of VFM empirically show that a Gaussian adapter is insufficient in both 2D toy experiments and image experiments. 
-The 2D experiments give good intuition for why a Gaussian is not expressive enough to approximate p_theta(z | y). 
-In particular, p_theta(x | y) can have multiple modes, and subsequently when pulling this distribution back through a nonlinear flow map, the disribution p_theta(z | y) is certainly unlikely to have a single mode. 
+The 2D experiments give good intuition for why a Gaussian is not expressive enough to approximate $p_theta$(z | y). 
+In particular, $p_theta$(x | y) can have multiple modes, and subsequently when pulling this distribution back through a nonlinear flow map, the disribution $p_theta$(z | y) is certainly unlikely to have a single mode. 
 A gaussian distribution cannot approximate a multimodal distribution. 
 
 To overcome this, the authors of VFM propose fine-tuning the flow map jointly with the noise adapter. 
@@ -1102,13 +1103,13 @@ All such approaches are known as guidance-based methods, as we are effectively g
 We now make formalise the framework of this approach, and discuss the different ways that this approach is implemented in practice. 
 
 \section{The Reward-tilted vector field}
-Given a reward tilted data distribution $\widetilde{p}_{\text{data}}^{\text{tilt}}(x) \propto p_{\text{data}}(x) \exp (r(x))$, and an unconditional marginal vector field u_t (defined with respect to CondOT-based probability path which starts at p_1 = standard normal, and p_0 = p_data), it can be proven that the following 'guided' vector field 
+Given a reward tilted data distribution $\widetilde{p}_{\text{data}}^{\text{tilt}}(x) \propto p_{\text{data}}(x) \exp (r(x))$, and an unconditional marginal vector field $u_t$ (defined with respect to CondOT-based probability path which starts at $p_1$ = standard normal, and $p_0 = p_data$), it can be proven that the following 'guided' vector field 
 \begin{equation}
     u_t^r(x_t) = u_t(x_t) + a_t \nabla_{x_t}V_t(x_t)
     \label{eq:guided_vector_field}
 \end{equation}
-follows a probability path which starts at p_1 = p_data and ends at p_0 = p_tilted. 
-Here, assuming that u_t is marginal vector field built on CondOT conditional probability path, $a_t = \left( \beta_t^2 \frac{\dot{\alpha}_t}{\alpha_t} - \beta_t \dot{\beta}_t \right)$ (we need to change this for CondOT rather than general gaussian probability path), and $V_t$ is called the value function. 
+follows a probability path which starts at $p_1 = p_data$ and ends at $p_0 = p_tilted$. 
+Here, assuming that $u_t$ is marginal vector field built on CondOT conditional probability path, $a_t = \left( \beta_t^2 \frac{\dot{\alpha}_t}{\alpha_t} - \beta_t \dot{\beta}_t \right)$ (we need to change this for CondOT rather than general gaussian probability path), and $V_t$ is called the value function. 
 
 We now take some time to define and understand the value function. The value function is defined as
 \begin{equation}
@@ -1141,7 +1142,7 @@ This appoximation requires us to evaluate the mean of the posterior, $\mathbb{E}
 Tweedie's formula gives us exactly this, and we now derive it. First recall that, the marginal vector field is defined as 
 $$u_t(x_t) = \int u_t(x_t \mid z) \frac{p_t(x_t \mid z) p_{\text{data}}(z)}{p_t(x_t)} dz = \mathbb{E}_{z \sim p_{1|t}(\cdot \mid x_t)} [u_t(x_t \mid z)].$$
 %to me, the notation p_{1|t}(\cdot \mid x_t) is quite strange. I'm not sure if it is standard notation. But i guess this is an object which was introduced in the flow matching section, just we never explicitly defined it as p_{1|t}(\cdot \mid x_t). ignore for now, but we want to make this clearer later. 
-Second, note that, assuming CondOT conditional probability path, we note that given clean data point z, if we have x_t sim p_t( | z), then $x_t = tz + (1 - t)\varepsilon$ and $u_t(x_t \mid z) = z - \varepsilon$. 
+Second, note that, assuming CondOT conditional probability path, we note that given clean data point z, if we have $x_t$ sim $p_t$( | z), then $x_t = tz + (1 - t)\varepsilon$ and $u_t(x_t \mid z) = z - \varepsilon$. 
 
 Noting that $\varepsilon = \frac{x_t - tz}{1 - t}$, we determine that 
 \[
@@ -1158,7 +1159,7 @@ Rearranging gives
 That is Tweedie's formula for condOT. This gives us a cheap way to approximate $V_t(x_t) \approx r(\mathbb{E}_{p_{1 \mid t}}[z])$ as it only requires one forward pass of the neural network, $u_t^\theta$. 
 Furthermore, we can backpropagate through $u_t^\theta$ in order to compute the gradient of the value function approximation $\nabla_{x_t} r(\hat{z}(x_t))$ (where $\hat{z}(x_t) := \mathbb{E}_{p_{1|t}}[z \mid x_t] = x_t + (1 - t) u_t^\theta(x_t)$). %make the notation nicer here later. 
 
-Several methods (DPS, PSLD, MPGD, FlowChef, FlowDPS) for inverse problem solving take this approach of approximating the mean as the posterior (using reward function as r(x) = log (p | x) + const). The main difference between these approaches is whether they compute the gradient $\nabla_{x_t} r(\hat{z}(x_t))$ exactly (DPS, PSLD), or whether they approximate it to avoid backpropagating through $u_t^\theta$ (MPGD, FlowChef, FlowDPS). Once computing the gradient direction, the methods also differ in the coefficient applied to the direction when adding it to the output of the unconditional velocity network. Such coefficient is never exactly a_t, and instead is often time-dependent, and/or tuned. 
+Several methods (DPS, PSLD, MPGD, FlowChef, FlowDPS) for inverse problem solving take this approach of approximating the mean as the posterior (using reward function as r(x) = log (p | x) + const). The main difference between these approaches is whether they compute the gradient $\nabla_{x_t} r(\hat{z}(x_t))$ exactly (DPS, PSLD), or whether they approximate it to avoid backpropagating through $u_t^\theta$ (MPGD, FlowChef, FlowDPS). Once computing the gradient direction, the methods also differ in the coefficient applied to the direction when adding it to the output of the unconditional velocity network. Such coefficient is never exactly $a_t$, and instead is often time-dependent, and/or tuned. 
 
 Several inverse problem solvers (DPS, PSLD, MPGD, FlowChef, FlowDPS) take this approach of approximating the posterior by its mean, with reward function $r(x) = \log p(y \mid x) + \text{const}$. The main difference between these approaches is whether they compute the gradient $\nabla_{x_t} r(\hat{z}(x_t))$ exactly (DPS, PSLD), or approximate it by $\nabla_{\hat{z}} r(\hat{z})$ to avoid backpropagating through $u_t^\theta$ (MPGD, FlowChef, FlowDPS). Having computed the gradient direction, the methods also differ in the coefficient applied to it when adding it to the output of the unconditional velocity network. This coefficient is never exactly $a_t$, and is often tuned empirically. 
 
@@ -1200,7 +1201,7 @@ Stochastic flow maps take the deterministic flow map $F(x_t, t, 1)=z$ and augmen
 $$z(\omega) \sim p_{1|t}(\cdot \mid x_t) \quad \text{with} \quad \omega \sim \mathcal{N}(0, I).$$
 Stochastic flow maps hence learn to map a tractable noise distribution onto the posterior, $ p_{1|t}(\cdot \mid x_t)$. This allows us to produce many samples from the posterior, using one forward pass per sample, enabling cheap and accurate estimation of $\nabla_{x_t}V_t(x_t)$. Meta Flow Maps and Diamond maps are two different approaches to constructing a stochastic flow map, $F(x_t, t, 1, \omega)$. 
 
-\subsubection{Summary} 
+\subsubsection{Summary} 
 Methods for sampling from a reward-tilted distribution which are training-free with respect to an unconditional generator, all require guiding a sampling trajectory. 
 Hence reward-alignment is many step. 
 Methods such as GFT which train a flow map to learn trajectories following a guided probability path, enable one or few-step generation of samples from a tilted reward distribution. 
@@ -1211,17 +1212,17 @@ This is the gap that our project aims to tackle.
 
 \chapter{Method}
 \section{The noise adapter as a normalising flow}
-Recall that the focus of this project is inverse problem solving, i.e. assuming a particular forward operator, and given any observation y*, we want to sample from p_data(x | y*). 
+Recall that the focus of this project is inverse problem solving, i.e. assuming a particular forward operator, and given any observation y*, we want to sample from $p_data$(x | y*). 
 VFM aims to solve this in the noise space of an unconditional flow map. 
-In particular, VFM aims to sample from the distribution p_theta(z | y*), which is the distribution obtained by pulling p_theta(x | y*) backwards through an unconditional flow map, which can sample from p_theta approx p_data. 
-Of course we cannot sample from p_theta(z | y*), and so VFM leverages the fact that its density is evaluable up to a normalising constant, in order to approximate the family of distributions p_theta(y | y*), for any y ~ p_data(y) using amortised variational inference. 
-In particular, p_theta(z | y) (for any y) is approximated using a diagonal gaussian variational distribution, whose mean and variance are output by a noise adapter. 
-But of course, a simple gaussian q_phi(z | y) is not expressive enough to approximate p_theta(z | y) well. 
+In particular, VFM aims to sample from the distribution $p_theta$(z | y*), which is the distribution obtained by pulling $p_theta$(x | y*) backwards through an unconditional flow map, which can sample from $p_theta$ approx $p_data$. 
+Of course we cannot sample from $p_theta$(z | y*), and so VFM leverages the fact that its density is evaluable up to a normalising constant, in order to approximate the family of distributions $p_theta$(y | y*), for any y ~ $p_data$(y) using amortised variational inference. 
+In particular, $p_theta$(z | y) (for any y) is approximated using a diagonal gaussian variational distribution, whose mean and variance are output by a noise adapter. 
+But of course, a simple gaussian $q_phi$(z | y) is not expressive enough to approximate $p_theta$(z | y) well. 
 Hence in VFM, they jointlly train the flow map with the noise adapter, i.e. both variational parameters phi and flow map parameters theta are jointly optimised under a single ELBO objective. 
-The aim of fine-tuning the flow map parameters theta, is to essentially warp the distirbution p_theta(z | y) such that it is simple enough to be approximated by a Gaussian distribution. 
+The aim of fine-tuning the flow map parameters theta, is to essentially warp the distirbution $p_theta$(z | y) such that it is simple enough to be approximated by a Gaussian distribution. 
 
 This approach yields good performance for inverse problem solving, however jointly training the flow map can be very expensive. 
-The natural solution is to simply make the variational distribution q_phi(z | y) more expressive so that it can accurately approximate p_theta(x | y) without requiring joint-training with the flow map. 
+The natural solution is to simply make the variational distribution $q_phi$(z | y) more expressive so that it can accurately approximate $p_theta$(x | y) without requiring joint-training with the flow map. 
 In particular, we would like to choose a variational family which is more expressive than the family of Gaussians with diagonal covariance matrix. 
 Additionally, it is vital that we are able to sample from and evaluate the log density of the distributions in this family. 
 This is because to optimise the variational parameters, we need to optimise the following ELBO-based objective 
@@ -1233,28 +1234,28 @@ This is because to optimise the variational parameters, we need to optimise the 
 This objective requires both being able to evaluate the log density of the variational distribution, and sampling from it. 
 This limits choice of distirbution family. 
 
-One possible choice is to choose q_phi(z | y) as a Gaussian with full covariance matrix. 
-However, given z in R^D, then making the noise adapter output D^2 values for the covariance matrix of q_phi(z | y) does not scale well as D increases, as is the case for inverse problem solving for images. 
+One possible choice is to choose $q_phi$(z | y) as a Gaussian with full covariance matrix. 
+However, given z in $R^D$, then making the noise adapter output $D^2$ values for the covariance matrix of $q_phi$(z | y) does not scale well as D increases, as is the case for inverse problem solving for images. 
 A more computationally efficient choice is to use a mixture of gaussians, each with diagonal covariance. 
 Instead of the noise adapter outputting a single mean and variance, the network outputs K mean and variance vectors, where K is a tuned hyperparameter representing the number of Gaussians in the mixture. 
-We decided against this approach because it would not scale well to image-level problems, where K may need to be very large in order to approximate p_theta(x| y*). 
+We decided against this approach because it would not scale well to image-level problems, where K may need to be very large in order to approximate $p_theta$(x| y*). 
 
-Instead, we decided to approximate q_theta(z | y) using a conditional normalising flow. 
+Instead, we decided to approximate $q_theta$(z | y) using a conditional normalising flow. 
 Fix, an observation, y*. 
-Recall that an (unconditional) normalising flow models q_theta(z | y*) by pushing a simple base distrubution (typically a standard mormal) through a learned diffeomorphism f_phi, which is parameterised by a neural network. 
-However, we want to approximate q_theta(z | y) for any arbitrary observation y. 
+Recall that an (unconditional) normalising flow models $q_theta$(z | y*) by pushing a simple base distrubution (typically a standard mormal) through a learned diffeomorphism $f_phi$, which is parameterised by a neural network. 
+However, we want to approximate $q_theta$(z | y) for any arbitrary observation y. 
 A conditional normalising flow enables exactly this. 
-It models a conditional distiribution q_theta(z | y) by pushing a simple base distrubution (typically a standard mormal) through a learned diffeomorphism f_phi(noise; y) which is parameterised by both neural network parameters phi, and observation y. 
-Importantly f_phi must be invertible with respect to noise (but not y). The observation y simply parameterises the diffeomorphism. 
+It models a conditional distiribution $q_theta$(z | y) by pushing a simple base distrubution (typically a standard mormal) through a learned diffeomorphism $f_phi$(noise; y) which is parameterised by both neural network parameters phi, and observation y. 
+Importantly $f_phi$ must be invertible with respect to noise (but not y). The observation y simply parameterises the diffeomorphism. 
 How the diffeomorphism is parameterised by y is a design choice, and we discuss how we achieve this later. 
 Importantly, a (conditional) normalising flow can in theory model arbitrarily complex distributions (cite result), and we can both sample from it and evaluate its log density via the change of variables formula. 
-This makes it a principled choice for the variational family to model p_theta(z | y). 
+This makes it a principled choice for the variational family to model $p_theta$(z | y). 
 
 \section{Training objectives}
 \subsection{Reverse KL}
-We have already shown that in order to approximate p_theta(z |y) with a variational distribution q_phi(z | y), we must optimise the variational parameters phi with the ELBO-based objective~\ref{eq:VFM_simple_ELBO_massaged}. 
+We have already shown that in order to approximate $p_theta$(z |y) with a variational distribution $q_phi$(z | y), we must optimise the variational parameters phi with the ELBO-based objective~\ref{eq:VFM_simple_ELBO_massaged}. 
 Recall that to derive this (see section on VI), we start with reverse KL between variational distribution and the target distribution. 
-The objective\ref{eq:VFM_simple_ELBO_massaged} does not specify the form of the variational distribution q_phi(z | y). We now instantiate this objective for the case when q_phi(z | y) is a conditional normalising flow. 
+The objective\ref{eq:VFM_simple_ELBO_massaged} does not specify the form of the variational distribution $q_phi$(z | y). We now instantiate this objective for the case when $q_phi$(z | y) is a conditional normalising flow. 
 
 \begin{equation}
     \label{eq:reverse_KL_NF}
@@ -1267,10 +1268,10 @@ Recall that in the section on normalising flows, we stated that it is possible t
 We have already discussed objective derived from reverse kl divergence. 
 However, it is in fact also possible to train via a forward kl objective. 
 Recall that training via forward kl divergence reduces to maximum likelihood estimation. 
-i.e. we wish to maximise the density that our model distribution p_phi(z | y) places at observed data z ~ p_theta(z | y). 
-Now, for a single observation y*, we can never generate multiple samples z ~ p_theta(z | y*), and so it is difficult to learn p_phi(z | y*) for a single observation y*. 
-However, in our case we are amortising over the observarion y*, i.e. we want to learn p_phi(z | y) for any y. 
-This can be made possible by noting we can generate pairs (z, y) ~ p_theta(z, y) by the following procedure 
+i.e. we wish to maximise the density that our model distribution $p_phi$(z | y) places at observed data z ~ $p_theta$(z | y). 
+Now, for a single observation y*, we can never generate multiple samples z ~ $p_theta$(z | y*), and so it is difficult to learn $p_phi$(z | y*) for a single observation y*. 
+However, in our case we are amortising over the observarion y*, i.e. we want to learn $p_phi$(z | y) for any y. 
+This can be made possible by noting we can generate pairs (z, y) ~ $p_theta$(z, y) by the following procedure 
 1) Sample noise: $z \sim \mathcal{N}(0, I)$
 2) Decode through the frozen flow map to get clean data: $x = f_\theta(z)$
 3) Apply the forward operator and observation noise: $y = Ax + \epsilon$, where $\epsilon \sim \mathcal{N}(0, \sigma^2)$.
@@ -1280,7 +1281,7 @@ $$ \sum_{i=1}^N \log q_\phi(z_i ; y_i)
 \label{eq:fKL_VFM_objective}
 $$
 where $(z_i, y_i) \sim p_\theta(z , y)$ for $i=1,...,N$.
-Importantly, since q_phi is a normalising flow, we can evaluate its log density, which enables exact evaluation of this objective. 
+Importantly, since $q_phi$ is a normalising flow, we can evaluate its log density, which enables exact evaluation of this objective. 
 
 Note that for general reward alignment, forward kl is not a tractable training objective. 
 inverse problem solving is a special case in which we can tractbly obtain a sample z from the tilted target noise distirbution, and only one such sample is sufficient because we are amortising over a fanmily of target nosie distirbutions. 
@@ -1312,7 +1313,7 @@ As previously discussed, a normalising flow may find it difficult to completely 
 We think ending at 50/50 share between both terms is sensible. 
 
 After training with weight 0 for rkl term (i.e. fkl only), we compute the fraction of the total gradient contributed by the reverse-KL term
-R = ‖g_rkl‖ / (‖g_fkl‖ + w‖g_rkl‖) e.g.  ‖g_fkl‖ = 105, ‖g_rkl‖ = 9727, so R = 93;
+R = ‖$g_rkl$‖ / (‖$g_fkl$‖ + w‖$g_rkl$‖) e.g.  ‖$g_fkl$‖ = 105, ‖$g_rkl$‖ = 9727, so R = 93;
 we then pick w such that the gradient share progressively increases from 5 \%, 15 \%, 40 \%, 55 \%
 note that this is relatively arbitrary
 note that the ratio drifts during trianing so realised shares deviate from target share. 
@@ -1320,7 +1321,7 @@ note that the ratio drifts during trianing so realised shares deviate from targe
 \subsection{$\beta$-VAE}
 In the reverse KL objective, the observation term rewards matching the observation, while the KL to prior term ensures that the learned distribiution does not deviate from the standard normal, subsequently ensuring that the noise adapter produces diverse samples which the flow map expects as input. 
 To control the balance between these two forces, we can tune a coefficient $\beta$ on the observation term
-L = L_fkl + w(step) · E_q[ log q(z|y) − log p(z) + β‖A f_θ(z) − y‖² / 2σ² ]
+L = $L_fkl$ + w(step) · $E_q$[ log q(z|y) − log p(z) + β‖A $f_θ$(z) − y‖² / 2σ² ]
 
 We can use this coefficient on the rKL term in combination of the mixed objective. 
 
@@ -1331,25 +1332,25 @@ We use noise augmentation. This section should discuss how the noise augmentatio
 %we can do this later, when we get the maths down for the noise augmentation in normalising flow background section
 
 \section{Building the noise adapter}
-Our method can be summarised as training a conditional normalising flow q_phi(z |y) to approximate the distribution over noise space, p_theta(z | y). We have discussed that we can train q_phi(z |y) to match p_theta(z | y) by optimising either the reverse or forward kl divergence between these distributions. 
-We now discuss exactly the functional form of the diffeomorphism f_phi of the normalising flow, (including how we condition f_phi on the observation y) that we use in our experiments. 
+Our method can be summarised as training a conditional normalising flow $q_phi$(z |y) to approximate the distribution over noise space, $p_theta$(z | y). We have discussed that we can train $q_phi$(z |y) to match $p_theta$(z | y) by optimising either the reverse or forward kl divergence between these distributions. 
+We now discuss exactly the functional form of the diffeomorphism $f_phi$ of the normalising flow, (including how we condition $f_phi$ on the observation y) that we use in our experiments. 
 Our initial experiments are on toy 2-dimensional data, and we progress to experiments on image data. 
 We separately construct the functional form of the diffeomorphism for both of these scales. 
 
 \subsection{Low-dimensional Toy Problems}
 \label{subsec:2D_NF_architecture}
 We first consider building a normalising flow for inverse problem solving in a 2D setting, with a 1D observation y. 
-In particular wish to learn a diffeomorphism f_phi, y: R^2 -> R^2, conditioned on y, which transforms samples from a base distribution, which we choose to be a standard normal. 
-We implenent f_phi as a composition of L=4 layers, each layer being an identical autogressive flow. 
+In particular wish to learn a diffeomorphism $f_phi$, y: $R^2 -> R^2$, conditioned on y, which transforms samples from a base distribution, which we choose to be a standard normal. 
+We implenent $f_phi$ as a composition of L=4 layers, each layer being an identical autogressive flow. 
 Let us consider one such layer, which takes z as input and transforms it to z' (going in the direction of base to target)
-Each autoregressive flow layer splits z into K=2 two parts, z_1, and z_2, both scalars, R. 
-Each part z_i is transformed via an affine function 
-z_i' = exp(a_i) * z_i + b_i
-the parameters of the affine function are computed as a function of z_<i and the observation y via the conditioner c. 
-i.e. (a_i, b_i) = c(z_<i, y).
+Each autoregressive flow layer splits z into K=2 two parts, $z_1$, and $z_2$, both scalars, R. 
+Each part $z_i$ is transformed via an affine function 
+$z_i'$ = exp$(a_i) * z_i + b_i$
+the parameters of the affine function are computed as a function of $z_<i$ and the observation y via the conditioner c. 
+i.e. ($a_i, b_i$) = c($z_<i$, y).
 this is exactly the mechanism by which we learn a \emph{conditional} normalising flow - the conditioner, c, takes as input the observation y, by simply concatenating it with z. 
 The conditioner is implemented as a MLP with two hidden layers of 64 units and ReLU activations. 
-It ensures the parameters (a_i, b_i) are a function of only inputs z_<i (and y) using the masking procedure from MADE (Masked Autoencoder for Distribution Estimation, Germain et al. 2015)
+It ensures the parameters ($a_i, b_i$) are a function of only inputs $z_<i$ (and y) using the masking procedure from MADE (Masked Autoencoder for Distribution Estimation, Germain et al. 2015)
 The premise of MADE is to sever connection weights that connect (both directly and indirectly) from input neuron $z_i$ to output neurons for $z'_{\geq i}$. Severing connection weights can be implemented by multiplying the weight matrices of the MLP element-wise with a binary mask. 
 Determining which weights to server is simple if you only have one hidden layer. However, as hidden layers increase, this becomes difficult. MADE severs connection weights by assigning a 'degree' to each neuron in the MLP. Concretely, 
 \begin{enumerate}
@@ -1369,7 +1370,7 @@ While we are not modelling a distribution over images directly, we are modelling
 We discussed exactly the architecture of TarFlow in the background section, and we give the hyperparamters we choose in the experiments section. 
 
 Natively, TarFlow implements the conditioner of each autoregressive layer as taking as input z rather than z'. 
-This means that computing f_phi can be cheaply evaluated while f_phi^-1 must be computed iteratively, via several forward passes of the conditioner network. (I think I have this the wrong way around)
+This means that computing $f_phi$ can be cheaply evaluated while $f_phi^-1$ must be computed iteratively, via several forward passes of the conditioner network. (I think I have this the wrong way around)
 Hence density evaluation is cheap while sampling is expensive. 
 This means that training via rkl is much more expensive than training via fkl. 
 But more importantly, sampling from the noise adapter at inference time is very expensive. 
@@ -1399,19 +1400,19 @@ projection, so that every affine transformation starts as the identity.
 The adapter is therefore \emph{exactly} the standard normal $q = \mathcal{N}(0, I)$ at initialisation, and training starts at the noise prior.
 
 \section{Evaluation Framework}
-Ultimately, the goal of inverse problem solving is, assuming a particular forward problem which acts on data x ~ p_data, and given an observation y*, produce samples from p_data which are 'consistent with the observation y*. 
-More precisely, the goal of inverse problem solving is to sample from p_data(x | y*). 
-Hence the ultimate test is to determine whether samples produced by an inverse problem solving method. are distributed according to the target distirbution, p_data(x | y*). 
+Ultimately, the goal of inverse problem solving is, assuming a particular forward problem which acts on data x ~ $p_data$, and given an observation y*, produce samples from $p_data$ which are 'consistent with the observation y*. 
+More precisely, the goal of inverse problem solving is to sample from $p_data$(x | y*). 
+Hence the ultimate test is to determine whether samples produced by an inverse problem solving method. are distributed according to the target distirbution, $p_data$(x | y*). 
 
-Note that in the framework of variational flow maps, we have two separate comoponents which work together to produce samples from p_data(x | y*): the noise adapter and the flow map. 
+Note that in the framework of variational flow maps, we have two separate comoponents which work together to produce samples from $p_data$(x | y*): the noise adapter and the flow map. 
 When using a reverse kl training objective (and keeping the flow map frozen), the noise adapter is only trained to produce noise which decodes into samples which are 'consistent' with the given observation y*, and which do not deviate significantly from the standard normal noise samples that the flow map expects as input. 
-The noise adapter has no ability to influence whether the noise it produces are realistic samples from the data distribution p_data. 
-In particular the best that our method can hope to achieve is produce noise samples, whichh when decoded, are distributed according to p_theta(x | y*), where p_theta is the distribution obtained by transporting the standard normal via the flow map from time step 1 to 0. 
-If the flow map is trained well, then p_theta is close to p_data, and subsequently p_theta(x | y*) is close to p_data(x | y*)
+The noise adapter has no ability to influence whether the noise it produces are realistic samples from the data distribution $p_data$. 
+In particular the best that our method can hope to achieve is produce noise samples, whichh when decoded, are distributed according to $p_theta$(x | y*), where $p_theta$ is the distribution obtained by transporting the standard normal via the flow map from time step 1 to 0. 
+If the flow map is trained well, then $p_theta$ is close to $p_data$, and subsequently $p_theta$(x | y*) is close to $p_data$(x | y*)
 
-Hence we can isolate the error of our noise adapter by comparing q_phi,theta(x | y*) with p_theta(x | y*). 
-And the erorr induced by the flow map can be isolated by comparing p_theta(x | y*) with p_data(x | y*)
-This is more specific than simply comparing p_theta(x) with p_data(x) because it tells you if the flow map has learned the data distribution well around the region which the data space which is consistent with observation y*. 
+Hence we can isolate the error of our noise adapter by comparing $q_phi$,theta(x | y*) with $p_theta$(x | y*). 
+And the erorr induced by the flow map can be isolated by comparing $p_theta$(x | y*) with $p_data$(x | y*)
+This is more specific than simply comparing $p_theta$(x) with $p_data$(x) because it tells you if the flow map has learned the data distribution well around the region which the data space which is consistent with observation y*. 
 
 To summarise we have (1) $q_{\phi, \theta}(x \mid y)$ -> (2) $p_\theta(x \mid y)$ -> (3) $p_\text{data}(x \mid y)$. %we can have a figure for this
 First gap is adapter error. Second gap is flow map error. 
@@ -1435,8 +1436,8 @@ The first two terms of ~\ref{eq:MMD} correspond to the 'within-set' similarities
 Can we compute MMD between any pair of distributions out of (1), (2) and (3) in practice?
 Of course our method gives us samples from (1). 
 For simple low-dimensional experiments, rejection sampling can often be used to obtain samples from both (2) or (3). 
-In particular, sample x from p_theta, accept with probability p(y* | x). By construction, we will obtain samples distributed according to p_theta(x | y*). We can use the same procedure to generate samples from p_data(x | y*). 
-However, for image-scale experiments, the acceptance probability will be so low that it is computationally infesible to obtain sufficient samples from p_theta(x | y*). 
+In particular, sample x from $p_theta$, accept with probability p(y* | x). By construction, we will obtain samples distributed according to $p_theta$(x | y*). We can use the same procedure to generate samples from $p_data$(x | y*). 
+However, for image-scale experiments, the acceptance probability will be so low that it is computationally infesible to obtain sufficient samples from $p_theta$(x | y*). 
 
 Can we compute MMD between any pair of distributions out of (1), (2) and (3) in
 practice? 
@@ -1452,73 +1453,73 @@ The expected acceptance rate is $\mathbb{E}_{p}[w(x)]/M$, which is only practica
 places non-negligible mass in the region consistent with $y^*$. 
 This holds for our low-dimensional experiments, but for image-scale experiments with high-dimensional observations the acceptance rate is vanishingly small, so obtaining samples from (2) or (3) is computationally infeasible.
 
-Therefore, we must consider alternative metrics for image-scale experiments, which indirectly give evidence of whether the inverse problem solving method is successfully producing samples from p_data(x | y*). 
+Therefore, we must consider alternative metrics for image-scale experiments, which indirectly give evidence of whether the inverse problem solving method is successfully producing samples from $p_data$(x | y*). 
 
 We now discuss such metrics. We separate the metrics we use for low-dimensional experiments, and the metrics we use for image scale experiments. 
 
 \subsubsection{Additional metrics for Low-dimensional experiments}
-Given an observation y in R, the output of all inverse problem solving methods that we evaluate (both ours and baseline methods), are N samples (x_i)_i=1^N from a distribution approximating p_data(x | y).
-For VFM, such N samples are obtained by sampling from the noise adapter, z_i = q_phi(z | y), and denoising via the flow map x_i = f_theta(z_i). 
-We determine the quality of the N samples produced by an inverse problem solving method, (x_i)_i=1^N, for a particular observation y, via the following metrics. 
-While we state each metric for a single measurement y, we will report each metric averaged over K observations, where each y is produced by corrupting a sample x_true ~ p_data according to the assumed forward model, y = Ax_true + e, where e ~ N(0, sigma^2)
+Given an observation y in R, the output of all inverse problem solving methods that we evaluate (both ours and baseline methods), are N samples $(x_i)_i=1^N$ from a distribution approximating $p_data$(x | y).
+For VFM, such N samples are obtained by sampling from the noise adapter, $z_i = q_phi$(z | y), and denoising via the flow map $x_i = f_theta(z_i)$. 
+We determine the quality of the N samples produced by an inverse problem solving method, $(x_i)_i=1^N$, for a particular observation y, via the following metrics. 
+While we state each metric for a single measurement y, we will report each metric averaged over K observations, where each y is produced by corrupting a sample $x_true$ ~ $p_data$ according to the assumed forward model, y = $Ax_true$ + e, where e ~ N(0, $sigma^2$)
 For all metrics, we provide the formula of its corresponding tractable Monte Carlo estimate which we use in practice, rather than the exact form. 
 We take N=100, K=10,000
 
 \textbf{Negative log predictive density (NLPD)}
-For a single observation y, and samples (x_i)_i=1^N, NLPD is computed as 
+For a single observation y, and samples $(x_i)_i=1^N$, NLPD is computed as 
 \begin{equation}
 \label{eq:NLPD}
     \text{NLPD}(y) = -\log \left[ \frac{1}{J} \sum_{j=1}^{J} \mathcal{N}(y; A x^{(j)}, \sigma^2) \right]
 \end{equation}
 where $\sigma$ is the standard deviation of the gaussian noise in the forward model.
-Ignoring the normalising constant of the Gaussian, and the negative log transformation, this metric averages |Ax_i - y|/sigma,  over all x_i. 
+Ignoring the normalising constant of the Gaussian, and the negative log transformation, this metric averages $|Ax_i$ - y|/sigma,  over all $x_i$. 
 i.e. it computes the average euclidean distance of the observation y to each sample (after being corrupted by the forward operator), weighted by the measurement noise of the forward model. 
 The smaller the measurement noise, sigma, the more NLPD penalises the euclidean distance between the corrupted sample and measurement.
 Intuitively, this metric scores how consistent the samples are with the measurement y under the assumed forward model. 
 
 \textbf{Continuous ranked probability score (CRPS)}
-Given a ground truth target, x_true, and samples (x_i)_i=1^N, CRPS is computed as 
+Given a ground truth target, $x_true$, and samples $(x_i)_i=1^N$, CRPS is computed as 
 \begin{equation}
 \label{eq:CRPS}
     \text{CRPS}(y) = \frac{1}{J}\sum_{j=1}^{J} \big\| x^{(j)} - x_{\text{true}} \big\|
     \;-\; \frac{1}{2J^2}\sum_{j=1}^{J}\sum_{k=1}^{J} \big\| x^{(j)} - x^{(k)} \big\|
 \end{equation}
-The first term in~\ref{eq:CRPS} computes the average euclidean distance between each of the N samples to the ground truth target x_true. 
+The first term in~\ref{eq:CRPS} computes the average euclidean distance between each of the N samples to the ground truth target $x_true$. 
 The second term computes the average distance between any two of the N samples. 
-CRPS is minimised when the N samples have large spread between them but are also all close to x_true. 
+CRPS is minimised when the N samples have large spread between them but are also all close to $x_true$. 
 
 \textbf{Support accuracy (SACC)}
-Given samples (x_i)_i=1^N, SACC computes the proportion of samples which land on the data manifold. For our low-dimensional experiment, p_data(x) is such that given a point x in R^2, either p_data(x)=0 or p_data(x) = c, for some constant c. 
-Hence we can copmute exactly the proportion of samples which are distributed according to p_data. 
+Given samples $(x_i)_i=1^N$, SACC computes the proportion of samples which land on the data manifold. For our low-dimensional experiment, $p_data$(x) is such that given a point x in $R^2$, either $p_data$(x)=0 or $p_data$(x) = c, for some constant c. 
+Hence we can copmute exactly the proportion of samples which are distributed according to $p_data$. 
 
 \subsubsection{Image-scale experiments}
 Following VFM, for image-scale experiments we use metrics: PSNR, SSIM, LPIPS, FID, MMD, CRPS. 
 We now give an overview of each metric, noting that the metrics MMD, CRPS are used differently compared to for the low-dimensional experiments. 
 \textbf{PSNR}
-Consider a single observation y, produced by applying the forward model to a sample x_true ~ p_data. 
-Additionally for a given inverse problem solving method, which aims to produce samples from p_data(x | y), consider a single sample a from that method. 
-The PSNR between x and x_true is computed as 
+Consider a single observation y, produced by applying the forward model to a sample $x_true$ ~ $p_data$. 
+Additionally for a given inverse problem solving method, which aims to produce samples from $p_data$(x | y), consider a single sample a from that method. 
+The PSNR between x and $x_true$ is computed as 
 \[
 \text{PSNR}(\hat{x}, x_{\text{true}}) = 10 \log_{10} \left( \frac{\text{MAX}^2}{\text{MSE}(\hat{x}, x_{\text{true}})} \right)
 \]
 where $\text{MSE}(\hat{x}, x_{\text{true}})$ is standard mean squared error in pixel-space between across all D=HxWx3 dimensions, and MAX is the range of the values a pixel can take. If images are in [-1,1], we use MAX=2.  
-Intuitively, PSNR evaluates, in pixel-space, the fidelity of a single output sample to the true sample x_true, which produced the observation y.  
+Intuitively, PSNR evaluates, in pixel-space, the fidelity of a single output sample to the true sample $x_true$, which produced the observation y.  
 The PSNR score is normalised against the range of possible pixel values, so that PSNR scores can be compared regardless of the pixel range used. 
-It can be shown that, in expectation, MSE (and hence PSNR) is minimised by letting x be the mean of p_data(x | y), rather than a true sample of p_data(x | y). 
-The mean of p_data(x | y) is an interpolation between true samples, and so is often a blurry image with high-frequency details lost. 
+It can be shown that, in expectation, MSE (and hence PSNR) is minimised by letting x be the mean of $p_data$(x | y), rather than a true sample of $p_data$(x | y). 
+The mean of $p_data$(x | y) is an interpolation between true samples, and so is often a blurry image with high-frequency details lost. 
 Hence this must be taken account when interpreting PSNR scores. 
 
 \textbf{SSIM}
-SSIM also evaluates the fidelity of a single sample x to x_true. 
+SSIM also evaluates the fidelity of a single sample x to $x_true$. 
 To evaluate the fidelity of x, break image into non-overlapping patches. 
-For each patch of x, we compute the similaity to the corresponding patch of x_true according to average pixel value (brightness) of the patch, standard deviation of pixels in that patch, and covariance between pixels of both patches. 
+For each patch of x, we compute the similaity to the corresponding patch of $x_true$ according to average pixel value (brightness) of the patch, standard deviation of pixels in that patch, and covariance between pixels of both patches. 
 This similarity score is averaged between all patches, to compute an overall SSIM score. 
 Unlike PSNR which scores based on raw pixel differences, SSIM compares local brightness, contrast and structure, so it better reflects perceived quality. 
-However, like PSNR, it is still a comparison against a single x_true, rather than whether samples follow p_data(x | y), and subsequently rewards methods which produce samples at the mean of p_data(x | y). 
+However, like PSNR, it is still a comparison against a single $x_true$, rather than whether samples follow $p_data$(x | y), and subsequently rewards methods which produce samples at the mean of $p_data$(x | y). 
 To compute SSIM, we use the same hyperparameters as the standard values from Wang et al. (2004). 
 
 \textbf{LPIPS}
-Again, LPIPS evaluates the similarity of a single sample x to x_true. 
+Again, LPIPS evaluates the similarity of a single sample x to $x_true$. 
 However, rather than comparing the images in pixel-space, as the previous two metrics do, LPIPS compares the images in the feature space of a neural network. 
 In particular, LPIPS feeds both images through a neural network. A common choice is AlexNet, which we adopt. 
 Each layer of AlexNet produces a feature map of dimension HxWxC. We can interpret a feature map as a grid of HxW spatial locations, with a C-dimensional feature vector at each spatial location.  
@@ -1526,15 +1527,15 @@ LPIPS chooses L layers for which we compare the feature map output of, between b
 For each layer, and each spatial location in that layer, we normalise the feature vectors to unit length for both images. We then take the difference of the two normalised vectors. 
 We finally average the norm of the differences across all layers and spatial locations to get an overall scalar LPIPS score. 
 Because LPIPS quantifies the difference between the two images in feature space, it can better capture the semantic difference between the two images. 
-For the same reason, LPIPS does not reward the mean of p_data(x | y) 
-However LPIPS still is still a comparison of one sample against the single draw x_true rather than a quantification of whether samples follow p_data(x | y)
+For the same reason, LPIPS does not reward the mean of $p_data$(x | y) 
+However LPIPS still is still a comparison of one sample against the single draw $x_true$ rather than a quantification of whether samples follow $p_data$(x | y)
 
 % For a given observation y, the aim of an inverse problem solving method is to produce samples from p_data(x | y). 
 % For a given method, PSNR, SSIM and LPIPS evaluate the fidelity of a single output sample to the true sample x_true, which produced the observation y. 
 % While PSNR, SSIM evaluate the fidelity directly in pixel space, LPIPS evaluates the fidelity in the embedding space of a CNN, and so captures semantic fidelity. 
 
 \textbf{FID (Fréchet Inception Distance)}
-All metrics so far evaluate how close a single produced sample is to the corresponding ground truth sample, x_true, and averages over a test set. 
+All metrics so far evaluate how close a single produced sample is to the corresponding ground truth sample, $x_true$, and averages over a test set. 
 On the other hand, we use FID to evaluate how similar a whole collection of generated samples is to the collection of corresponding ground truth samples. 
 In particular, the collection generated samples is obtained by using the inverse problem solving method to produce a single sample for each observation y, in a test set. 
 The collection of ground truth samples is simply the collection of true images that were corrupted to obtain the observations in the test set. 
@@ -1561,9 +1562,9 @@ Thus even if the two sets have moments which are equal, while FID would report a
 
 \textbf{CRPS}
 We use the same estimator for CRPS as we used in low-dimensional experiments~\ref{eq:CRPS}. 
-Rather than evaluating CRPS in pixel space, both the ground truth sample x_true, and samples generated from the inverse problem solving method are converted to feature embeddings of an Inception-v3 network. 
+Rather than evaluating CRPS in pixel space, both the ground truth sample $x_true$, and samples generated from the inverse problem solving method are converted to feature embeddings of an Inception-v3 network. 
 We again using feature space of a network so that the pairwise distances in~\ref{eq:CRPS} captures perceptual similarity. 
-Out of all the metrics for image-scale experiments, CRPS is the only metric which is minimised when the predictive distribution of the inverse problem solving method matches the true posterior p_data(x | y). 
+Out of all the metrics for image-scale experiments, CRPS is the only metric which is minimised when the predictive distribution of the inverse problem solving method matches the true posterior $p_data$(x | y). 
 We must choose, as a hyperparameter, N, the number of generated samples per measurement y. 
 We choose N=10, following VFM. 
 We also choose K=128 observations to average over. 
@@ -1610,14 +1611,14 @@ Black dots represents samples from the true posterior obtained by rejection samp
 \end{figure}
 
 \subsection{Base Flow Map Training}
-For all methods which we evaluate, whether the method keeps the flow map frozen or fine tunes it, requires a base flow map which can generate samples from the unconditional checkerbaord data distribution, p_data(x). 
+For all methods which we evaluate, whether the method keeps the flow map frozen or fine tunes it, requires a base flow map which can generate samples from the unconditional checkerbaord data distribution, $p_data$(x). 
 We use a flow map with model weights trained by VFM authors. 
-In particular, they train a neural network to learn the average velocity parameterisation of a flow map, V(x_t, t, s). 
-The neural network is an MLP with 6 layers, SiLU activation function, hidden dimension of 512, input is concatenation of v_t, t and s, in R^4. 
+In particular, they train a neural network to learn the average velocity parameterisation of a flow map, V($x_t$, t, s). 
+The neural network is an MLP with 6 layers, SiLU activation function, hidden dimension of 512, input is concatenation of $v_t$, t and s, in $R^4$. 
 They train the network in two separate stages. 
 In the first stage, they train the network quiried at r = t to predict the instantaneous velocity using a flow matching training algorithm, using a CondOT conditional probability path. 
 In the second stage, they train the network to output the average velocity across all interval sizes using the MeanFlow training algorithm. 
-Both stages use the same optimiser configuration (AdamW, learning rate 2x10⁻⁴, weight decay 10⁻⁴, batch size 2048) and run for 50,000 iterations using the same 20,000 samples from p_data(x). The second stage is initialised from the first stage's weights with a re-initialised optimiser. 
+Both stages use the same optimiser configuration (AdamW, learning rate 2x10⁻⁴, weight decay 10⁻⁴, batch size 2048) and run for 50,000 iterations using the same 20,000 samples from $p_data$(x). The second stage is initialised from the first stage's weights with a re-initialised optimiser. 
 
 \subsection{Noise Adapter Training}
 We now briefly discuss how we train the noise adapter in our method alongside the baseline methods. 
@@ -1633,7 +1634,7 @@ We use the same fixed set of 20,000 true checkerboard samples that we used to tr
 Because forward KL is a plain regression on exact pairs, training is more stable and so we can use a higher learning rate with fewer steps. 
 
 \subsubsection{Gaussian Adapter with frozen $\theta$}
-Following the VFM authors, the Gaussian noise adapter is a SiLU MLP with four hidden layers of width 256 taking the scalar observation y as input with two linear heads outputting μ(y) in R^2 and log σ(y) in R^2 (clamped to [-6, 3] for stability. 
+Following the VFM authors, the Gaussian noise adapter is a SiLU MLP with four hidden layers of width 256 taking the scalar observation y as input with two linear heads outputting μ(y) in $R^2$ and log σ(y) in $R^2$ (clamped to [-6, 3] for stability. 
 We train using forward kl and using reverse kl with the exact same setup and hyperparameters as for the normalising flow adapter. The only difference is that the KL to prior term in the reverse KL objective, is evaluated in closed form rather than by Monte Carlo. 
 We note that the Gaussian adapter (0.20M params) is ~11x larger than the NF adapter (18.7k). 
 
@@ -1715,26 +1716,26 @@ its jointly fine-tuned map. Best per row in bold.}
 \label{tab:checkerboard_results}
 \end{table}
 
-We see in table~\ref{tab:checkerboard_results} that MMD between q_{φ,θ}(x | y) and p_data(x | y) is lower for VFM than for frozen-theta methods. 
-In fact, the MMD for VFM is statistically indisstinguisable from 0: when computing MMD between two distinct sets of J=100 samples of p_data(x | y) obtained by rejection sampling, and averaging over 10,000 observations, we obtain 0.0295. 
+We see in table~\ref{tab:checkerboard_results} that MMD between $q_{φ,θ}$(x | y) and $p_data$(x | y) is lower for VFM than for frozen-theta methods. 
+In fact, the MMD for VFM is statistically indisstinguisable from 0: when computing MMD between two distinct sets of J=100 samples of $p_data$(x | y) obtained by rejection sampling, and averaging over 10,000 observations, we obtain 0.0295. 
 This is very close to the MMD scores ~0.03 for VFM. 
 
-The fact that MMD between p_theta(x | y) and p_data(x | y) is lower for VFM than for frozen-theta methods tells us that fine-tuning the flow map reorganises the noise-space geometry in such a way that the theoretical best possible distribution that the noise adapter can hope to learn (i.e. p_theta(x | y)) is closer to the true posterior, p_data(x | y)) for VFM than for frozen-theta methods. 
-To isolate how well the noise adapter learns the theoretical best possible distribution, we consider MMD between q_{φ,θ}(x | y) and p_θ(x | y).
+The fact that MMD between $p_theta$(x | y) and $p_data$(x | y) is lower for VFM than for frozen-theta methods tells us that fine-tuning the flow map reorganises the noise-space geometry in such a way that the theoretical best possible distribution that the noise adapter can hope to learn (i.e. $p_theta$(x | y)) is closer to the true posterior, $p_data$(x | y)) for VFM than for frozen-theta methods. 
+To isolate how well the noise adapter learns the theoretical best possible distribution, we consider MMD between $q_{φ,θ}$(x | y) and $p_θ$(x | y).
 This isolates the error of the noise adapter.
 We see that even after isolating the error of the noise adapter, VFM has the best MMD, with our NF adapters closely trailing behind. 
-We believe this is because in VFM, fine-tuning theta has allowed the noie space to warp such that p_theta(z | y) is much easier for the noise adapter to learn compared to when theta is frozen. 
-The figures confirm this: for frozen theta,  p_theta(z | y) (with y=0.5) has two near-disjoint modes, whereas for VFM,  p_theta(z | y) has a single mode and so can be easily approximated with a simple Gaussian. 
-We see that  MMD(q_{φ,θ}, p_θ) is worst for Gaussian adapter trained with rKL. The figures show why - the adapter fails to learn all modes. 
+We believe this is because in VFM, fine-tuning theta has allowed the noie space to warp such that $p_theta$(z | y) is much easier for the noise adapter to learn compared to when theta is frozen. 
+The figures confirm this: for frozen theta,  $p_theta$(z | y) (with y=0.5) has two near-disjoint modes, whereas for VFM,  $p_theta$(z | y) has a single mode and so can be easily approximated with a simple Gaussian. 
+We see that  MMD($q_{φ,θ}$, $p_θ$) is worst for Gaussian adapter trained with rKL. The figures show why - the adapter fails to learn all modes. 
 The Gaussian adapter trained with fKL has better MMD, however still behind the NF adapter. 
 Again, the figures show why visually: a simple Gaussian cannot represent a multimodal distribution without placing mass between the separate modes. 
-On the other hand, the figures show that the NF adapter (both when trained with rKL and fKL) is able to concentrate its mass at all modes of p_data(x | y), without placing significant mass between them. 
+On the other hand, the figures show that the NF adapter (both when trained with rKL and fKL) is able to concentrate its mass at all modes of $p_data$(x | y), without placing significant mass between them. 
 The NLPD and CRPS metrics are generally consistent with the MMD metrics. 
 The main exception is that Gaussian adapter trained with rKL has better NLPD than when it is trained with fKL, despite having worse MMD.
-This is because NLPD only evaluates the consistency of produced samples with the measurement y, and hence is blind to whether such samples cover all modes of p_data(x | y).
+This is because NLPD only evaluates the consistency of produced samples with the measurement y, and hence is blind to whether such samples cover all modes of $p_data$(x | y).
 
 The SACC scores are generally high for all methods and hence show that the decoded samples land on the checkerboard squares around 90\% of the time. 
-The Gaussian adapter trained with rKL has the best SACC, and this is likely explained by the fact that it only produces samples from one checkerboard square of p_data(x | y), and hence is less likely to produce samples which land off the checkerboard squares.
+The Gaussian adapter trained with rKL has the best SACC, and this is likely explained by the fact that it only produces samples from one checkerboard square of $p_data$(x | y), and hence is less likely to produce samples which land off the checkerboard squares.
 We note that, in general, good SACC is determined by the noise adapter producing samples which do not deviate from the N(0,I) prior, and the flow map is accurate. 
 Visually, we can see that the noise adapter is producing samples within N(0,I) prior. 
 Hence our reported SACC scores for all methods are mainly limited by the flow map itself rather than the noise adapter. 
@@ -1742,7 +1743,7 @@ To confirm this, we also decoded 10,000 standard normal samples via the K=4 flow
 The SACC scores reported in Table~\ref{tab:checkerboard_results} are all around 0.9, indicating that the noise adapter is not predominantly to blame for the SACC scores not being closer to 1, but rather the flow map itself.
 
 \section{Image Inverse Problems}
-We now move on to several inverse problem settings where the data distribution p_data(x) is now over images. 
+We now move on to several inverse problem settings where the data distribution $p_data$(x) is now over images. 
 In particular, for all our experiments, we use the CIFAR-10 dataset, which consists of 60,000 32x32 images, with 3 RGB colour channels. 
 The dataset consists of 10 mutually exclusive classes (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck), with 6,000 images per class.
 The dataset is split into 50,000 training images and 10,000 test images. 
@@ -1750,7 +1751,7 @@ There is no official validation split, but we set aside a fixed, randomly select
 
 \subsection{Common Setup}
 \subsubsection{Base Flow Map}
-Our method requires a base flow map which can generate samples from the unconditional data distribution, p_data(x).
+Our method requires a base flow map which can generate samples from the unconditional data distribution, $p_data$(x).
 We use the weights of the flow map released by the authors of MeanFlow (Geng et al., 2025).
 The authors train an unconditional flow map (no class labels) using the MeanFlow algorithm on the CIFAR-10 training set. 
 They use a U-Net (Song et al.) with 55.9M parameters, operating directly in pixel space rather than in latent space. 
@@ -1783,12 +1784,12 @@ All experiments run in PyTorch~2.13 (CUDA~13.0) on a single RTX~A5000.
 \subsection{Brightness Steering}
 Before considering more difficult inverse problems with higher dimensional observations, we first consider a simple inverse problem where the observation y is a single scalar value corresponding to the mean brightness of the image.
 In particular, we define the forward problem as follows. 
-Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 → R is the mean over all 3·32·32 pixel values, with each pixel in [-1, 1],  ε ~ N(0, σ²), σ = 0.05. 
-We choose σ to be small enough so that samples from p(x | y) are visibly different from p(x), but large enough so that it is copmutationally feasible to obtain samples from p_data(x | y) via rejection sampling (we measured around 9\% acceptance). 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: $R^3072$ → R is the mean over all 3·32·32 pixel values, with each pixel in [-1, 1],  ε ~ N(0, σ²), σ = 0.05. 
+We choose σ to be small enough so that samples from p(x | y) are visibly different from p(x), but large enough so that it is copmutationally feasible to obtain samples from $p_data$(x | y) via rejection sampling (we measured around 9\% acceptance). 
 
-As always, the task is to solve the Bayesian inverse problem, i.e. produce samples from p_data(x | y). 
+As always, the task is to solve the Bayesian inverse problem, i.e. produce samples from $p_data$(x | y). 
 For this simple setting, we only consider a single fixed observation y* = 0.2, which is roughly one standard deviation above the mean brightness level (of 4000 generated samples from the flow map).
-Hence we train unconditional noise adapters to approximate p_data(x | y*) for this fixed y*. 
+Hence we train unconditional noise adapters to approximate $p_data$(x | y*) for this fixed y*. 
 We only consider a single fixed observation y* because we want to isolate the failure of a Gaussian adapter to the lack of expressivity of the Gaussian distribution, rather than any failure due to amortisation, often referred to as the Amortisation gap in the literature.
 
 \begin{figure}[t]
@@ -1811,14 +1812,14 @@ $y^{*} = 0.2$. Conditioning visibly brightens the samples.}
 
 \subsubsection{Adapter Training}
 We compare a diagonal Gaussian adapter and a Normalising Flow adapter, keeping the flow map frozen in both cases.
-As we are no longer amortising over the observation y, for the diagnoal Gaussian adapter, we directly optimise its mean and variance parameters, both R^3072.
+As we are no longer amortising over the observation y, for the diagnoal Gaussian adapter, we directly optimise its mean and variance parameters, both $R^3072$.
 While it is possible to use full covariance Gaussian, it would be computationaly infesible when moving to the amortised setting. 
 In particular, for D=3072, the covariance matrix would have 4.72M entries.
 An output layer that maps an e.g. 512 dimension feature vector to 4.72M values, would require 2.4 billion parameters. 
 
 We train the Gaussian and Normalising Flow adapters using the reverse KL objective. 
 Futhermore, we additionally train a separate Gaussian adapter using the forward KL objective in order to show that the failure of the Gaussian adapter is due to the lack of expressivity of the Gaussian distribution, rather than due to the mode seeking nature of the reverse KL objective.
-Training via forward KL requires samples from p_theta(z | y*), which we obtain by rejection sampling from the frozen flow map.
+Training via forward KL requires samples from $p_theta$(z | y*), which we obtain by rejection sampling from the frozen flow map.
 We collect 50,000 such samples for training. 
 For a diagonal Gaussian, minimising fKL (or equivalently, maximising the likelihood) can be performed in closed form rather than by gradient descent. 
 
@@ -1827,12 +1828,12 @@ We also optimise the normalising flow parameters with Adam for 6000 steps at bat
 
 \subsubsection{Results}
 To visualise the performance of each method, Figure~\ref{fig:brightness_adapters} shows samples produced by decoding noise samples from each trained noise adapter via the frozen flow map. 
-Comparing to samples from Figure~\ref{fig:brightness_prior_posterior}b, we see that the NF adapter and even the Gaussian adapter trained with forward KL produces samples which visually match samples from p_theta(x | y). 
-On the other hand, the Gaussian adapter trained with reverse KL produces images which are predominantly characterised by the top half of the image being white, and the bottom half being darker. This indicates that the Gaussian adapter has learned to produce samples from one mode of p_theta(z | y*) rather than the full distribution, which is as expected when training with reverse KL.
+Comparing to samples from Figure~\ref{fig:brightness_prior_posterior}b, we see that the NF adapter and even the Gaussian adapter trained with forward KL produces samples which visually match samples from $p_theta$(x | y). 
+On the other hand, the Gaussian adapter trained with reverse KL produces images which are predominantly characterised by the top half of the image being white, and the bottom half being darker. This indicates that the Gaussian adapter has learned to produce samples from one mode of $p_theta$(z | y*) rather than the full distribution, which is as expected when training with reverse KL.
 
-We also provide a quantitative evaluation of each method. Because we do not amortise over the observation y, we do cannot follow the evaluation framework of Section~\ref{sec:eval_framework}. In particular, as outlined in the framework, the PSNR, SSIM and LPIPS metrics evaluare the similarity of a single sample produced by the inverse problem solving method to a single sample from the true posterior p_data(x | y*), and average over the observation y. Hence, these metrics are not applicable in this setting, where we have a single fixed observation y*.
+We also provide a quantitative evaluation of each method. Because we do not amortise over the observation y, we do cannot follow the evaluation framework of Section~\ref{sec:eval_framework}. In particular, as outlined in the framework, the PSNR, SSIM and LPIPS metrics evaluare the similarity of a single sample produced by the inverse problem solving method to a single sample from the true posterior $p_data$(x | y*), and average over the observation y. Hence, these metrics are not applicable in this setting, where we have a single fixed observation y*.
 
-Instead, for each method we produce 50,000 samples from the trained noise adapter and decode them via the frozen flow map and compare against 50,000 samples from the posterior p_theta(x | y*) obtained by rejection sampling. We choose p_theta(x | y*) rather than p_data(x | y*) to allow us to obtain a set of 50,000 samples. 
+Instead, for each method we produce 50,000 samples from the trained noise adapter and decode them via the frozen flow map and compare against 50,000 samples from the posterior $p_theta$(x | y*) obtained by rejection sampling. We choose $p_theta$(x | y*) rather than $p_data$(x | y*) to allow us to obtain a set of 50,000 samples. 
 For each method, we compute the similarity of its produced samples and the true posterior samples using various metrics as shown in table~\ref{tab:brightness_steering}.
 
 We see that the mean and standard deviation of the brightness values of the samples produced by the NF adapter is 0.184 and 0.064 respectively, which is very close to the mean and standard deviation of the true posterior samples, which we computed to be 0.1887 and 0.0498 respectively. 
@@ -1840,8 +1841,8 @@ On the other hand, the brightness standard deviation of both Gaussian adapters a
 To further quantify this, we compute the Wasserstein-1 distance between the brightness values of the samples produced by each method and the true posterior samples. 
 Finally, we compute FID and MMD between both sets of samples, using the same Inception-v3 feature space as in Section~\ref{sec:eval_framework}.
 We see that the Gaussian adapter trained with reverse KL has especially poor FID and MMD, which is consistent with the visualisation of its samples in Figure~\ref{fig:brightness_adapters}. 
-We note that the NF adapter has an FID of 0.98, which is lower than the FID of 2.81 of the unconditional flow map samples p_theta(x) to the cifar10 train set p_data(x). 
-This unusually low FID is because we are comparing with p_theta(x | y*) rather than p_data(x|y*).
+We note that the NF adapter has an FID of 0.98, which is lower than the FID of 2.81 of the unconditional flow map samples $p_theta$(x) to the cifar10 train set $p_data$(x). 
+This unusually low FID is because we are comparing with $p_theta$(x | y*) rather than $p_data$(x|y*).
 
 \begin{figure}[t]
 \centering
@@ -1893,24 +1894,24 @@ against oracle posterior samples in Inception feature space. Best in bold.}
 \subsection{Super-Resolution}
 We now test the efficacy of our method a 4x super-resolution inverse problem setting. 
 In particular, we define the forward problem as follows, 
-Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 -> R^192 downsamples x by a factor of 4 (from 32×32×3 to 8×8×3),  e ~ N(0, σ²I) and σ = 0.05. 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: $R^3072 -> R^192$ downsamples x by a factor of 4 (from 32×32×3 to 8×8×3),  e ~ N(0, σ²I) and σ = 0.05. 
 We choose σ = 0.05 as this matches the standard in inverse problem solving literature. 
 Following the protocol of VFM, we use bicubic downsampling with antialiasing, so that each pixel in Ax is a weighted average of a local neighbourhood of pixels in x. 
 
 Unlike in the brightness inverse problem, we now amortise over observations. More precisely, we train noise adapters which are conditioned on the observation y.  
-Futhermore, it is no longer computaitonally feasible to obtain samples from p_theta(x | y) via rejection sampling in this super-resolution setting because the acceptance probability for a 192-dimensional observation is too small. 
-Hence we cannot evaluate the samples produced by our method directly against p_theta(x | y), and we use the evaluation framework outlined in the method section. 
+Futhermore, it is no longer computaitonally feasible to obtain samples from $p_theta$(x | y) via rejection sampling in this super-resolution setting because the acceptance probability for a 192-dimensional observation is too small. 
+Hence we cannot evaluate the samples produced by our method directly against $p_theta$(x | y), and we use the evaluation framework outlined in the method section. 
 Finally, because the checkerboard and brightness experiments have established that a Gaussian adapter with frozen $theta$ is insuffient, we only evaluate NF adapters with frozen $theta$ moving forward. 
 
 \subsubsection{Noise Adapter Training details}
 \textbf{Conditioning mechanism}
 Now that we amortise over observations, we discuss how we give the observation as input to the TarFlow noise adapter. 
 Givem an observation y in 3x8x8, we first process it using a CNN with three 3x3 convolutional layers with SiLU activation function, to produce a 64x8x8 output (i.e. 64 feature maps, with resolution kept at 8x8). 
-Hence, for each of the 8^2=64 observation pixels, we have a 64-dimensional feature vector. 
+Hence, for each of the $8^2=64$ observation pixels, we have a 64-dimensional feature vector. 
 Since TarFlow's 4x4 patching gives exactly 8² = 64 tokens, there is a one-to-one spatial correspondence between observation feature vectors and flow tokens. 
 
 For each of the NB=4 blocks of TarFlow, a separate learned Linear(64→256) projects the observation feature vectors to the token dimension. 
-The projected feature vector is added to the spatially-matching token embedding immediately after proj_in + positional embedding. 
+The projected feature vector is added to the spatially-matching token embedding immediately after $proj_in$ + positional embedding. 
 Importantly, we make sure to appropriately permute the observation embeddings to align with the spatially-matching token embeddings. 
 
 The embedding CNN has 0.14M parameters, and so the conditional adapter has 6.67M in total. We purposefully use a very light low-prameter embedding CNN as we did not find that, for super-resolution, more parameters significantly influenced results. 
@@ -1998,7 +1999,7 @@ We see that, on the whole, the rKL adapter produces samples which are consistent
 We note that, for each adapter, the generated samples do not match the object class of the true sample. 
 We attribute this to the fact that we do not use a class-conditioned flow map (nor do we class-condition our noise adapter). 
 Hence givem a downsampled observation with no class information, it is genuinely ambiguous which class of object the observation comes from. 
-In other words, p_data(x | y) for a given observation y geneuniely represents a distribution over many classes. 
+In other words, $p_data$(x | y) for a given observation y geneuniely represents a distribution over many classes. 
 
 \begin{table}[t]
 \centering
@@ -2022,7 +2023,7 @@ ground-truth images in Inception feature space. Best in bold.}
 
 Finally, using the 9k test samples, we evaluate the metrics outlined in the evaluation framework, for each of the three adapters. 
 Table~\ref{tab:sr_ablation} shows that adapter trained via a mixed objective wins on every per-sample fidelity metric (PSNR, SSIM, LPIPS), while the fkl-trained adapter wins on every distributional metric (FID, MMD, CRPS). 
-Hence adding the reverse kl loss to the forward kl objective results in improved fidelity to the true sample which produced the observation, but the worse FID and MMD indicate that it results in samples which deviate from true cifar10 samples x ~ p_data(x). This is consistent with the figrues which show that the samples produced by the fkl-trained adapter are sharper. Theoretically, this is also to be expected since the maximum likelihood objective directly encourages the approximate distirbution q, to place mass at noise obtained by sampling from N(0, I) directly. 
+Hence adding the reverse kl loss to the forward kl objective results in improved fidelity to the true sample which produced the observation, but the worse FID and MMD indicate that it results in samples which deviate from true cifar10 samples x ~ $p_data$(x). This is consistent with the figrues which show that the samples produced by the fkl-trained adapter are sharper. Theoretically, this is also to be expected since the maximum likelihood objective directly encourages the approximate distirbution q, to place mass at noise obtained by sampling from N(0, I) directly. 
 
 Moving forward, all adapters we train use the mixed objective because it offers the best balance between observation fidelity and diversity. 
 
@@ -2030,9 +2031,9 @@ Moving forward, all adapters we train use the mixed objective because it offers 
 We now evaluate our normalising flow adapter trained with the mixed objective against several guidance-based baselines and VFM which jointly trains the flow map with a Gaussian noise adapter. 
 
 Recall from Related Work section that guidance methods steer the trajectory of the ODE defined by the mariginal unconditional vector field, and so requires a flow model which can output instantaneous velocities, $v(x_t, t)$ along trajectories. 
-Since our flow map can produce instantaneous velocities (i.e. V(x_t, t, t) = v(x_t, t)), we can use the same network which paramerises our flow map to unroll trajectories using Euler's method in principle. However, in practice, when producing samples in this way, using 100 integration steps, we obtain an FID of 4.48 compared to 2.81 for the one-step decode. 
+Since our flow map can produce instantaneous velocities (i.e. V($x_t$, t, t) = v($x_t$, t)), we can use the same network which paramerises our flow map to unroll trajectories using Euler's method in principle. However, in practice, when producing samples in this way, using 100 integration steps, we obtain an FID of 4.48 compared to 2.81 for the one-step decode. 
 Therefore, running the guidance baselines by using the flow map as a flow model would not provide a fair comparison. We instead run the guidance baselines with the 1-Rectified Flow model of
-\citet{liu2023flow}, whose FID we evaluate as $2.77$ using the RK45 adaptive solver which used 124 integration steps on average. 
+\textcite{liu2023flow}, whose FID we evaluate as $2.77$ using the RK45 adaptive solver which used 124 integration steps on average. 
 
 All guidance baselines we evaluate aside from DAPS all guide trajectories by nudging the trajectory by the gradient of an estimate of the value function - see related work for more detail. 
 To ensure a rigorous comparison, each baseline method's hyperparameters are selected by a hyperparameter search on the fixed 1k sample validation set. 
@@ -2043,7 +2044,7 @@ As an additional baseline, we jointly train a Gaussian adapter with the flow map
 To evaluate our method against the baselines, we show samples from each method in Figure~\ref{fig:sr_baselines_qualitative}. 
 We additionally compute the metrics outlined in the evaluation framework, on the test set. 
 Table~\ref{tab:sr_baselines} shows that no method dominates for this super-resolution task. 
-We see that FlowDPS performs best on PSNR and SSIM, however as previously discussed, these metrics reward samples at the mean of the posterior, p_data(x | y), which is typically a blurry interpolation between real posterior samples. This is confirmed by Figure~\ref{fig:sr_baselines_qualitative}, which shows that of all methods, FlowDPS produces the blurriest samples. Additionally, FlowDPS has the worst FID of all methods. 
+We see that FlowDPS performs best on PSNR and SSIM, however as previously discussed, these metrics reward samples at the mean of the posterior, $p_data$(x | y), which is typically a blurry interpolation between real posterior samples. This is confirmed by Figure~\ref{fig:sr_baselines_qualitative}, which shows that of all methods, FlowDPS produces the blurriest samples. Additionally, FlowDPS has the worst FID of all methods. 
 Our method performs best on MMD, and is closely behind FlowChef on FID, signifying that our method can produce realistic images which are on the data manifold. 
 We note that all FID scores are upwardly biased due to the fact that we only evaluate on a 9k test set (copmared to the 50k samples used to evaluate the base flow map). 
 VFM beats our method on all per-sample fidelity metrics, which indicate that samples produced by VFM are more consistent with the observation. 
@@ -2104,14 +2105,14 @@ RTX A5000. Best in bold.}
 \subsection{Inpainting}
 We finally test the efficacy of our method in an inpainting inverse problem setting. 
 In particular, we define the forward problem as follows, 
-Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: R^3072 -> R^3072 masks a central 12x12 box with zeroes, e ~ N(0, σ²I) with σ = 0.05. 
+Given $x ~ p_data(x)$, we compute an observation as $y = Ax + e$, where A: $R^3072 -> R^3072$ masks a central 12x12 box with zeroes, e ~ N(0, σ²I) with σ = 0.05. 
 
 \subsubsection{Noise Adapter Training details}
 \textbf{Conditioning mechanism}
 Unlike in super-resolution, the observation for inpainting has the same resolution as full image. 
 Hence, we must modify the mechanism that we use to input the observation to the TarFlow noise adapter. 
 Given a 3x32x32 observation, we first process it using a CNN with residual blocks which downsamples the spatial resolution from 32x32 to 8x8 and increases the number of channels to 64 (i.e. we have 64 8x8 feature maps). 
-Hence, for each of the 8^2=64 spatial positions of the output feature map, we have a 64-dimensional feature vector. 
+Hence, for each of the $8^2=64$ spatial positions of the output feature map, we have a 64-dimensional feature vector. 
 We have a one-to-one spatial correspondence between the 64 observation feature vectors and 64 flow tokens. 
 We additionally apply two transformer layers over the 64 observation feature vectors so that each feature vector can easily encode context from the whole observation. 
 This is important because filling the masked region requires context from the whole image, not just a local region. 
@@ -2308,8 +2309,8 @@ Given that our method achieves an FID~ of 11.6~\ref{tab:inp_baselines} this indi
 For context, the best FID of all baselines is 6.84. 
 
 To investigate the hypothesis more directly, we can compare the distribution of the norms of the latents produced by our noise adapter, against the norms of standard normal latents. 
-It can be proven that for z ~ N(0, I_D) the norm ||z|| follows a chi distribution with D degrees of freedom. For D=3072, we compute a mean of 55.421 with standard deviation of 0.707. 
-We compare this distribution against samples from our noise adapter q_phi(x | y) separately for two representative observations y, shown in Figure~\ref{fig:h1_samples}. We deliberately chose two observations for which our method fails on. 
+It can be proven that for z ~ N(0, $I_D$) the norm ||z|| follows a chi distribution with D degrees of freedom. For D=3072, we compute a mean of 55.421 with standard deviation of 0.707. 
+We compare this distribution against samples from our noise adapter $q_phi$(x | y) separately for two representative observations y, shown in Figure~\ref{fig:h1_samples}. We deliberately chose two observations for which our method fails on. 
 Figure~\ref{fig:h1_norms} shows that the adapter's latents are tightly concentrated (with standard deviation of 0.7), however have a mean of 53.2. 
 This is evidence that the samples are indeed slightly out-of-distribution. 
 
@@ -2354,7 +2355,7 @@ Table~\ref{tab:h2_gen_vs_real} shows that when evaluating our method on observat
 This indicates that even when, by construction, there does exist a region in noise space which decodes onto images whose pixels match the observation, the noise adapter simply struggles to find this region. 
 Hence we attribute the failure of our method only partly to this hypothesis. 
 
-\textbf{Hypothesis 3 - The ambiguity of the masked region makes it difficult to learn q_phi(z | y)}
+\textbf{Hypothesis 3 - The ambiguity of the masked region makes it difficult to learn $q_phi$(z | y)}
 
 \begin{figure}[t]
 \centering
@@ -2404,12 +2405,12 @@ Hence we conclude that ambiguity of the masked region in the inpainting task is 
 To conclude, we have ruled out flow map quality, out-of-distribution latents and ambiguity of the masked region as sole culprits for the failure of our method. 
 We believe that instead the failure on the inpainting task (and inversion) arises due to the difficulty of predicting latents in the nosie space at time t=1. 
 This is clearest in the case of inversion, where the observation gives complete information for every pixel in the image. 
-Consider the pullback of the posterior p_theta(x | y) through the flow map at an arbitrary time point (rather than to time t=1). 
-Call this distribution q_phi,t(z | y). 
-Our noise adapter tries to predict q_phi,0(z | y). 
-However, as t increases, q_phi,t(z | y) is easier to learn because we already have the observation y. 
+Consider the pullback of the posterior $p_theta$(x | y) through the flow map at an arbitrary time point (rather than to time t=1). 
+Call this distribution $q_phi$,t(z | y). 
+Our noise adapter tries to predict $q_phi$,0(z | y). 
+However, as t increases, $q_phi$,t(z | y) is easier to learn because we already have the observation y. 
 We expect that predicting noise further along the trajectory, rather than at time t=1, will be easier to learn. 
-We can then use a single decode from the flow map to take the intermediate point x_t to time t=0, giving a sample. 
+We can then use a single decode from the flow map to take the intermediate point $x_t$ to time t=0, giving a sample. 
 
 Ultimately, npise space is very far away from data space, so it is difficult to find the noise which decodes onto the correct region in data space, especially when given very complete information on which region of the data space to decode to (in the case of inpainting and inversion). It is easier to to find the region at a further time point along the trajectory, which decodes onto the correct data region under the flow map. 
 
