@@ -24,6 +24,13 @@
 % stay single-spaced (setspace does this automatically).
 \usepackage{setspace}
 \onehalfspacing
+\makeatletter
+\g@addto@macro\normalsize{%
+  \setlength\abovedisplayskip{6pt plus 2pt minus 2pt}%
+  \setlength\belowdisplayskip{6pt plus 2pt minus 2pt}%
+  \setlength\abovedisplayshortskip{0pt plus 2pt}%
+  \setlength\belowdisplayshortskip{4pt plus 2pt minus 2pt}}
+\makeatother
 
 % Plain centred page number at the foot of every page; no running heads.
 \usepackage{fancyhdr}
@@ -101,7 +108,21 @@
 
 %%%%% BIBLIOGRAPHY
 % Numeric citations, references listed in order of first appearance.
-\usepackage[style=numeric-comp, sorting=none, backend=biber, doi=false, isbn=false]{biblatex}
+\usepackage[style=numeric-comp, sorting=none, backend=biber, doi=false, isbn=false, natbib=true]{biblatex}
+
+
+% Author-year alternative: comment out the numeric line above and uncomment these three lines.
+% \usepackage[style=authoryear-comp, sorting=nyt, backend=biber,
+%             maxcitenames=2, uniquelist=false, uniquename=false,
+%             doi=false, isbn=false, natbib=true]{biblatex}
+
+
+
+% % "Ho et al., 2020" with a comma, and "Song & Ermon" with an ampersand
+% \renewcommand*{\nameyeardelim}{\addcomma\space}
+% \renewcommand*{\finalnamedelim}{\addspace\&\space}
+
+
 \addbibresource{references.bib}
 \renewcommand*{\bibfont}{\raggedright\small}
 
@@ -227,42 +248,42 @@ Finally, family.
 
 
 \chapter{Introduction}
-One goal of generative modelling is to learn how to produce novel samples that resemble those drawn from an unknown data distribution $p_{\mathrm{data}}$. Diffusion and flow models have been highly successful at this task, achieving state-of-the-art results in image, video and audio generation. Both use the same high-level framework for generation: samples $\mathbf{z}\sim p_{\mathrm{base}}$ drawn from a simple noise distribution are transformed continuously over time towards the data distribution.
+One goal of generative modelling is to learn how to produce novel samples that resemble those drawn from an unknown data distribution $p_{\mathrm{data}}$. Diffusion and flow models \parencite{DDPM,Song_diffusion,diffusion_design,lipman_FM,rectified_flow} have been highly successful at this task, achieving state-of-the-art results in image, video and audio generation \parencite{rombach2022highresolutionimagesynthesislatent,ho2022videodiffusionmodels,liu2023audioldmtexttoaudiogenerationlatent}. Both use the same high-level framework for generation: samples $\mathbf{z}\sim p_{\mathrm{base}}$ drawn from a simple noise distribution are transformed continuously over time towards the data distribution \parencite{albergo2025stochasticinterpolantsunifyingframework}.
 
-Flow and diffusion models specify the dynamics of this continuous transformation between noise and data as governed by an ordinary differential equation (ODE) and a stochastic differential equation (SDE), respectively. 
+Flow and diffusion models specify the dynamics of this continuous transformation between noise and data as governed by an ordinary differential equation (ODE) and a stochastic differential equation (SDE), respectively \parencite{lipman_FM,mit_FM}. 
 An ODE defines a path from a noise to data sample by specifying the local velocity at each point along it. 
 In a flow model, a neural network is trained to predict this velocity. 
 Generating data therefore consists of iteratively advancing a sample from noise to data through a sequence of small steps, querying the neural network at each step to determine the direction of travel.
-Consequently, although flow models enable high-fidelity generation, they can often require hundreds of neural network evaluations, which can be computationally prohibitive. 
+Consequently, although flow models enable high-fidelity generation, they can often require hundreds of neural network evaluations \parencite{diffusion_design}, which can be computationally prohibitive. 
 
-Flow maps address this limitation by training a neural network to predict the cumulative displacement between any two times along the noise-to-data paths defined by the ODE, rather than the local velocity at a single point. 
+Flow maps \parencite{boffi2025flowmapmatchingstochastic,boffi2025buildconsistencymodellearning} address this limitation by training a neural network to predict the cumulative displacement between any two times along the noise-to-data paths defined by the ODE, rather than the local velocity at a single point. 
 A flow map can therefore transport a noise sample directly to a data sample in a single neural network evaluation. 
-Flow maps can be learned by bootsrapping from a pre-trained flow model via distillation. However, it is also possible train a flow map from scratch, as demonstrated by MeanFlow. 
+Flow maps can be learned by bootsrapping from a pre-trained flow model via distillation \parencite{song2023consistencymodels,boffi2025flowmapmatchingstochastic}. However, it is also possible train a flow map from scratch, as demonstrated by MeanFlow \parencite{geng2025meanflowsonestepgenerative}. 
 
 \section{Problem Setting and Research Gap}
-Many applications require conditional generation: producing samples from the data distribution that satisfy an external condition, such as a class label or text prompt. A canonical example of conditional generation is inverse problem solving, in which an observation \(\mathbf{y}\) is generated by corrupting an unknown data sample \(\mathbf{x}\sim p_{\mathrm{data}}\) according to $\mathbf{y}=\mathcal{A}(\mathbf{x})+\boldsymbol{\eta}$, where \(\mathcal{A}\) is a known forward operator and \(\boldsymbol{\eta}\) represents measurement noise. In image inverse problems, for example, \(\mathcal{A}\) may downsample, blur or mask an image. Since these operations typically discard information, multiple data samples may be consistent with the same observation. The goal of inverse problem solving is therefore to draw samples from the posterior \(p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})\), which represents the distribution of plausible data samples consistent with the given observation \(\mathbf{y}\).
+Many applications require conditional generation: producing samples from the data distribution that satisfy an external condition, such as a class label or text prompt \parencite{dhariwal2021diffusionmodelsbeatgans,ho2022classifierfreediffusionguidance,rombach2022highresolutionimagesynthesislatent}. A canonical example of conditional generation is inverse problem solving \parencite{ongie2020deeplearningtechniquesinverse}, in which an observation \(\mathbf{y}\) is generated by corrupting an unknown data sample \(\mathbf{x}\sim p_{\mathrm{data}}\) according to $\mathbf{y}=\mathcal{A}(\mathbf{x})+\boldsymbol{\eta}$, where \(\mathcal{A}\) is a known forward operator and \(\boldsymbol{\eta}\) represents measurement noise. In image inverse problems, for example, \(\mathcal{A}\) may downsample, blur or mask an image. Since these operations typically discard information, multiple data samples may be consistent with the same observation. The goal of inverse problem solving is therefore to draw samples from the posterior \(p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})\), which represents the distribution of plausible data samples consistent with the given observation \(\mathbf{y}\).
 
-One approach to conditional generation is to train a generative model specifically for the conditional task, either from scratch or by fine-tuning a pretrained unconditional model. This can provide fast conditional generation, including one-step generation with a flow map. However, adapting the generative model to each new conditional generation setting typically requires a new round of training or fine-tuning, which can be prohibitively expensive for large generative models.
+One approach to conditional generation is to train a generative model specifically for the conditional task, either from scratch or by fine-tuning a pretrained unconditional model \parencite{ho2022classifierfreediffusionguidance,meng2023distillationguideddiffusionmodels}. This can provide fast conditional generation, including one-step generation with a flow map \parencite{geng2025meanflowsonestepgenerative,chen2025visualgenerationguidance}. However, adapting the generative model to each new conditional generation setting typically requires a new round of training or fine-tuning, which can be prohibitively expensive for large generative models.
 
-Guidance-based methods offer an alternative for flow (and diffusion) models. These methods keep the pretrained unconditional flow model frozen but nudge its velocity prediction at each sampling step, thereby steering the path from noise towards a data sample that satisfies the given condition. This approach hence allows for same unconditional model to be reused across different conditional generation settings without fine-tuning.
+Guidance-based methods offer an alternative for flow (and diffusion) models. These methods keep the pretrained unconditional flow model frozen but nudge its velocity prediction at each sampling step, thereby steering the path from noise towards a data sample that satisfies the given condition \parencite{chung2024diffusionposteriorsamplinggeneral,song2023pseudoinverseguided,Zhang_2025,kim2025flowdpsflowdrivenposteriorsampling}. This approach hence allows for same unconditional model to be reused across different conditional generation settings without fine-tuning.
 
-However, this guidance strategy does not transfer naturally to one-step generation with a flow map. A flow map transports an initial noise sample directly to a data sample in a single evaluation, leaving no intermediate predictions through which guidance can be applied. The key insight of Variational Flow Maps (VFM) is that generation can instead be controlled through the choice of starting noise. For a one-step unconditional flow map, the starting noise is the only remaining lever for controlling its output. Conditional generation can therefore be reframed as learning a distribution over starting noise samples that the flow map sends to data samples satisfying the given condition.
+However, this guidance strategy does not transfer naturally to one-step generation with a flow map. A flow map transports an initial noise sample directly to a data sample in a single evaluation, leaving no intermediate predictions through which guidance can be applied. The key insight of Variational Flow Maps (VFM) \parencite{VFM} is that generation can instead be controlled through the choice of starting noise. For a one-step unconditional flow map, the starting noise is the only remaining lever for controlling its output. Conditional generation can therefore be reframed as learning a distribution over starting noise samples that the flow map sends to data samples satisfying the given condition.
 
 Let $p_{\theta}(\mathbf{x})$ denote the model distribution (which approximates $p_\text{data}(\mathbf{x})$) obtained by drawing $\mathbf{z}\sim p_{\mathrm{base}}$ and passing it through the flow map, where $\theta$ denotes the neural-network parameters of the flow map.
 For a given condition $\mathbf{y}$, VFM formulates the required noise distribution as the noise-space posterior $p_{\theta}(\mathbf{z}\mid\mathbf{y})$.
 Intuitively, this distribution is obtained by pulling the corresponding model posterior $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ backwards through the flow map into noise space.
 
 
-Although \(p_{\theta}(\mathbf{z}\mid\mathbf{y})\) cannot be sampled from directly, its density can be evaluated up to a normalising constant, making variational inference (VI) a natural approach for approximating it. VI introduces a tractable distribution \(q_{\phi}(\mathbf{z}\mid\mathbf{y})\), called a variational distribution, with parameters \(\phi\), to approximate this posterior.
+Although \(p_{\theta}(\mathbf{z}\mid\mathbf{y})\) cannot be sampled from directly, its density can be evaluated up to a normalising constant, making variational inference (VI) \parencite{Blei_2017} a natural approach for approximating it. VI introduces a tractable distribution \(q_{\phi}(\mathbf{z}\mid\mathbf{y})\), called a variational distribution, with parameters \(\phi\), to approximate this posterior.
 Fitting \(q_{\phi}(\mathbf{z}\mid\mathbf{y})\) using the variational objective requires both being able to sample from it and evaluate its density. VFM satisfies these requirements by parameterising \(q_{\phi}(\mathbf{z}\mid\mathbf{y})\) as a diagonal Gaussian whose mean and variance are predicted from \(\mathbf{y}\) by a neural network, termed the noise adapter. 
 
 Although a Gaussian supports both sampling and exact density evaluation, it may be too simple to approximate the potentially complex noise-space posterior \(p_{\theta}(\mathbf{z}\mid\mathbf{y})\). VFM compensates for this by jointly training the noise adapter and the flow map, allowing the geometry of the noise space to be reshaped such that \(p_{\theta}(\mathbf{z}\mid\mathbf{y})\) can be more easily approximated by a simple Gaussian distribution.  
 VFM therefore enables one-step conditional generation, but only by fine-tuning the flow map. This leaves open whether one-step conditional generation can be achieved while keeping the unconditional flow map fixed. 
 
 \section{Proposed Approach and Main Findings}
-The central question of this project is whether a more expressive variational distribution $q_{\phi}(\mathbf{z}\mid\mathbf{y})$ can approximate \(p_{\theta}(\mathbf{z}\mid\mathbf{y})\) while leaving the pretrained flow map frozen. We investigate this question by replacing VFM's Gaussian noise adapter with a conditional normalising flow. Normalising flows support both sampling and exact density evaluation, satisfying the requirements of variational training while being capable of representing substantially more complex distributions than a Gaussian. When amortising over observations $\mathbf{y}$, the inverse-problem setting also naturally permits the approximating distribution, $q_{\phi}(\mathbf{z}\mid\mathbf{y})$, to be learned via maximum likelihood estimation. We therefore introduce a training objective that combines the variational loss with a maximum-likelihood loss, and show that the combination is more effective than either loss alone.
+The central question of this project is whether a more expressive variational distribution $q_{\phi}(\mathbf{z}\mid\mathbf{y})$ can approximate \(p_{\theta}(\mathbf{z}\mid\mathbf{y})\) while leaving the pretrained flow map frozen. We investigate this question by replacing VFM's Gaussian noise adapter with a conditional normalising flow \parencite{VI_NF,NF_survey}. Normalising flows support both sampling and exact density evaluation, satisfying the requirements of variational training while being capable of representing substantially more complex distributions than a Gaussian. When amortising over observations $\mathbf{y}$, the inverse-problem setting also naturally permits the approximating distribution, $q_{\phi}(\mathbf{z}\mid\mathbf{y})$, to be learned via maximum likelihood estimation. We therefore introduce a training objective that combines the variational loss with a maximum-likelihood loss \parencite{BG}, and show that the combination is more effective than either loss alone.
 
-The resulting approach enables one-step conditional generation using an existing pretrained unconditional flow map while keeping its parameters fixed. Solving each new conditional task using this approach requires training only a lightweight noise adapter. We evaluate the method across inverse problems of increasing difficulty, progressing from a two-dimensional checkerboard problem to image brightness, \(4\times\) super-resolution and inpainting. On the two-dimensional problem, the Gaussian adapter fails to approximate the noise-space posterior accurately, whereas the normalising-flow adapter captures its multimodal structure. For \(4\times\) super-resolution, our method achieves the lowest maximum mean discrepancy (MMD) among all evaluated baselines, including VFM. 
+The resulting approach enables one-step conditional generation using an existing pretrained unconditional flow map while keeping its parameters fixed. Solving each new conditional generation setting using this approach requires training only a lightweight noise adapter. We evaluate the method across inverse problems of increasing difficulty, progressing from a two-dimensional checkerboard problem to image brightness, \(4\times\) super-resolution and inpainting. On the two-dimensional problem, the Gaussian adapter fails to approximate the noise-space posterior accurately, whereas the normalising-flow adapter captures its multimodal structure. For \(4\times\) super-resolution, our method achieves the lowest maximum mean discrepancy (MMD) among all evaluated baselines, including VFM. 
 
 However, we find that the approach is not competitive on image inpainting. Our analysis suggests that the main difficulty is learning, in a single step, which initial noise samples will map to images matching an observation that constrains many pixel values. This motivates training the adapter to predict a point partway along the noise-to-data path, rather than the initial noise itself, before mapping that point to data in a single flow-map evaluation. We leave the development of this extension to future work.
 
@@ -284,155 +305,288 @@ This thesis makes the following contributions:
 
 \section{Thesis Overview}
 
+
+
 \chapter{Background}
 
+This chapter introduces the background required to understand the proposed method. We first formalise the goals of generative modelling and conditional generative modelling. We then introduce inverse problems as the conditional generation setting considered in this thesis and relate them to the broader framework of reward alignment. Next, we review the flow-based generative models on which the project builds upon: normalising flows, flow models trained through flow matching, and flow maps. Finally, we introduce variational inference and Variational Flow Maps (VFM), which our approach directly builds on. 
+
 \section{Generative Modelling}
+Suppose we wish to generate examples of a particular class of object. This class may be defined as broadly or narrowly as we like. We restrict our attention to objects that can be represented as vectors $\mathbf{x}\in\mathbb{R}^{D}$. In generative modelling, we assume that there exists a target probability distribution $p_{\mathrm{target}}(\mathbf{x})$ which places high density on vectors corresponding to plausible examples of the specified class of object. The goal of generative modelling is to learn an algorithm that can produce samples from this target distribution.
 
-\subsubsection{The Goal of Generative Modelling}
+Often, the target distribution is a data distribution $p_{\mathrm{data}}(\mathbf{x})$ over, for example, images, videos or molecular structures. In this setting, we typically have access to a finite dataset $\mathcal{D}=\{\mathbf{x}^{(i)}\}_{i=1}^{N}$ of samples from the data distribution. Using this dataset, the aim is to learn a model distribution $p_{\theta}(\mathbf{x})$ that approximates $p_{\mathrm{data}}(\mathbf{x})$. Depending on the generative modelling method, it may support sampling from $p_{\theta}(\mathbf{x})$, evaluating its density, or both. 
 
-\subsection{Reward Alignment}
+Many generative models, such as generative adversarial networks (GANs) \parencite{GAN} and the flow-based generative models \parencite{NF_survey,lipman_FM,geng2025meanflowsonestepgenerative} considered in this thesis, generate data by first drawing noise $\mathbf{z}\sim p_{\mathrm{base}}$ from a simple base distribution and then transforming it into a data sample $\mathbf{x}$. The learned transformation should induce a model distribution $p_{\theta}(\mathbf{x})$ that approximates the target distribution. 
+
+\subsection{Conditional Generative Modelling}
+
+Often, we do not wish to generate an arbitrary sample from the target distribution. Instead, we wish to generate samples that satisfy a given condition $\mathbf{y}\in\mathbb{R}^{M}$, where $\mathbf{y}\sim p_{Y}(\mathbf{y})$. For example, $p_{Y}$ may be a distribution over class labels, or text prompts. This task is known as conditional generative modelling. For a given condition $\mathbf{y}$, the task can be formalised as sampling from the conditional target distribution $p_{\mathrm{target}}(\mathbf{x}\mid\mathbf{y})$ \parencite{mit_FM}.
+
+Typically, we do not want an algorithm that can generate samples for only one fixed condition. Instead, the aim is to learn an algorithm that can generate samples for different conditions $\mathbf{y}\sim p_Y(\mathbf{y})$. For example, an image generator may be required to accept different text prompts.
 
 \subsection{Inverse Problems}
 
-\subsubsection{Relation to Reward Alignment}
+Inverse problem solving is a canonical example of conditional generation and is the focus of this thesis. To define an inverse problem, we first define the corresponding forward problem. Let $\mathbf{x}\sim p_{\mathrm{data}}(\mathbf{x})$ be a data sample and let $\mathcal{A}:\mathbb{R}^{D}\rightarrow\mathbb{R}^{M}$ be a known forward operator. The forward operator acts on $\mathbf{x}$ to produce an observation
+\begin{equation}
+\mathbf{y}
+=
+\mathcal{A}(\mathbf{x})+\boldsymbol{\eta},
+\qquad
+\boldsymbol{\eta}
+\sim
+\mathcal{N}(\mathbf{0},\sigma_y^2\mathbf{I}_{M})
+\label{eq:forward_problem}
+\end{equation}
+where $\boldsymbol{\eta}$ represents measurement noise. In image inverse problems, for example, $\mathcal{A}$ may blur, downsample or mask an image. The forward problem consists of computing the observation $\mathbf{y}$ from the data sample $\mathbf{x}$ \parencite{ongie2020deeplearningtechniquesinverse}.
 
-\section{Flow-based generative models}
+The inverse problem is the reverse problem. Given an observation $\mathbf{y}$, the aim is to infer the unknown data sample $\mathbf{x}$ from which it was produced. However, the forward operator typically destroys information and is therefore not invertible. Several data samples may consequently be consistent with the same observation. Therefore, bayesian inverse problem solving instead aims to draw samples from the posterior distribution
+\begin{equation}
+p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})
+=
+\frac{
+p(\mathbf{y}\mid\mathbf{x})
+p_{\mathrm{data}}(\mathbf{x})
+}{
+p_Y(\mathbf{y})
+}
+\label{eq:inverse_problem_posterior}
+\end{equation}
+where $p(\mathbf{y}\mid\mathbf{x})$ is the likelihood of observing $\mathbf{y}$ given $\mathbf{x}$. Under the Gaussian measurement model in Equation~\ref{eq:forward_problem}, the likelihood is
+\begin{equation}
+p(\mathbf{y}\mid\mathbf{x})
+=
+\mathcal{N}\left(
+\mathbf{y}
+\mid
+\mathcal{A}(\mathbf{x}),
+\sigma_y^2\mathbf{I}_{M}
+\right)
+\propto
+\exp\left(
+-\frac{
+\lVert\mathbf{y}-\mathcal{A}(\mathbf{x})\rVert_2^2
+}{
+2\sigma_y^2
+}
+\right)
+\label{eq:inverse_problem_likelihood}
+\end{equation}
+Substituting the likelihood into Equation~\ref{eq:inverse_problem_posterior} gives
+\begin{equation}
+p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})
+\propto
+p_{\mathrm{data}}(\mathbf{x})
+\exp\left(
+-\frac{
+\lVert\mathbf{y}-\mathcal{A}(\mathbf{x})\rVert_2^2
+}{
+2\sigma_y^2
+}
+\right)
+\label{eq:inverse_problem_posterior_gaussian}
+\end{equation}
+The posterior therefore assigns high density to samples that are both plausible under $p_{\mathrm{data}}(\mathbf{x})$ and consistent with the observation $\mathbf{y}$.
+
+\subsection{Relation to Reward Alignment}
+Conditional generation can be viewed as a particular instance of the broader task of reward alignment. This connection allows us to discuss general approaches for reward alignment in the related-work chapter with the view that they can be applied to conditional generation tasks, such as inverse problem solving.
+
+Reward alignment aims to generate samples from the target distribution with specified desirable properties, as quantified by a reward function $r(\mathbf{x})$. For example, a reward function may compute an aesthetic rating of an image. Reward alignment can be formalised as sampling from 
+\begin{equation}
+p_{\mathrm{reward}}(\mathbf{x})
+\propto
+p_{\mathrm{target}}(\mathbf{x})
+\exp\left(r(\mathbf{x})\right)
+\label{eq:reward_tilted_distribution}
+\end{equation}
+This distribution reweights the target distribution towards samples with higher reward, and is known as the reward-tilted distribution \parencite{huang2026guideflowfewstepalignment,MFM,Diamond_maps}.
+
+To express conditional generation as reward alignment, we let each condition $\mathbf{y}$ define a corresponding reward function $r_{\mathbf{y}}(\mathbf{x})$. In particular, we choose this reward to be the log-likelihood of the condition given the sample $r_{\mathbf{y}}(\mathbf{x}) = \log p(\mathbf{y}\mid\mathbf{x})$
+The corresponding reward-tilted distribution is
+\begin{equation}
+p_{\mathrm{reward}}(\mathbf{x}\mid\mathbf{y})
+\propto
+p_{\mathrm{target}}(\mathbf{x})
+p(\mathbf{y}\mid\mathbf{x})
+\propto
+p_{\mathrm{target}}(\mathbf{x}\mid\mathbf{y})
+\label{eq:conditional_generation_as_reward_alignment}
+\end{equation}
+For the inverse problems defined above, $p(\mathbf{y}\mid\mathbf{x})$ is the likelihood in Equation~\ref{eq:inverse_problem_likelihood}. In this example, samples receive a high reward when they are consistent with the observation. Inverse problem solving is therefore a particular instance of conditional generation, which can itself be formulated as reward alignment \parencite{VFM}.
+
+\section{Flow-Based Generative Modelling}
+Flow-based generative models transform samples from a tractable base distribution $p_{\mathrm{base}}(\mathbf{z})$ into samples from a target distribution $p_{\mathrm{target}}(\mathbf{x})$. Normalising flows represent this transformation as a finite composition of invertible maps \parencite{NF_survey}. Flow models and flow maps represent it as a continuous transformation governed by an ODE. While flow models learn the vector field defining the ODE \parencite{lipman_FM,mit_FM}, flow maps instead aim to directly learn the integral of the ODE \parencite{sander_MF}.
+
+These models play different roles in this thesis. A pretrained flow map acts as the generative model that maps noise to data, while a normalising flow is later used as the noise adapter. Flow models provide the continuous-time framework from which flow maps are defined.
 
 \subsection{Normalising Flows}
+We now give an overview of normalising flows because noise adapter in our method is chosen to be a normalising flow. We make this choice because normalising flows can represent complex distributions while supporting both sampling and exact density evaluation, enabling variational training. We first define normalising flows and explain how their densities are evaluated. We then introduce autoregressive flows which is the specific variation of normalising flows which we use in the thesis. Finally we explain how normalising flows can be learned using forward or reverse KL divergence objectives. 
 
-\subsubsection{Constructing Normalising Flows}
+\subsubsection{Definition and Change of Variables}
+
+
+
+
+
+
+\subsubsection{Constructing Expressive and Tractable Flows}
+
+\subsubsection{Autoregressive Normalising Flows}
+
+\subsubsection{Transformer Autoregressive Flows}
 
 \subsubsection{Training Normalising Flows}
 
-\subsubsection{Forward KL divergence}
 
-\subsubsection{Reverse KL divergence}
 
-\subsection{Flow Matching}
 
-\subsubsection{ODE Definition}
 
-\subsubsection{Flow Model Definition}
+% \section{Generative Modelling}
 
-\subsubsection{Sampling from a Flow Model}
+% \subsubsection{The Goal of Generative Modelling}
 
-\subsubsection{Flow Matching}
+% \subsection{Reward Alignment}
 
-\subsection{Flow Maps}
+% \subsection{Inverse Problems}
 
-\section{Variational Inference}
+% \subsubsection{Relation to Reward Alignment}
 
-\subsection{Amortised VI}
+% \section{Flow-based generative models}
 
-\subsection{Stochastic VI}
+% \subsection{Normalising Flows}
 
-\section{Variational Flow Maps}
+% \subsubsection{Constructing Normalising Flows}
 
-\subsection{Joint training of noise adapter and flow map}
+% \subsubsection{Training Normalising Flows}
 
-\chapter{Related Work}
+% \subsubsection{Forward KL divergence}
 
-\section{The Reward-tilted vector field}
+% \subsubsection{Reverse KL divergence}
 
-\section{Estimating the Value Function with Flow models}
+% \subsection{Flow Matching}
 
-\subsubsection{Make the reward function robust to noise.}
+% \subsubsection{ODE Definition}
 
-\subsubsection{Approximating the posterior as the mean}
+% \subsubsection{Flow Model Definition}
 
-\subsubsection{Monte Carlo approximation of the posterior}
+% \subsubsection{Sampling from a Flow Model}
 
-\subsubsection{Sequential Monte Carlo}
+% \subsubsection{Flow Matching}
 
-\subsection{Estimating the Value Function with Flow Maps}
+% \subsection{Flow Maps}
 
-\chapter{Method}
+% \section{Variational Inference}
 
-\section{The noise adapter as a normalising flow}
+% \subsection{Amortised VI}
 
-\section{Training objectives}
+% \subsection{Stochastic VI}
 
-\subsection{Reverse KL}
+% \section{Variational Flow Maps}
 
-\subsection{Forward KL}
+% \subsection{Joint training of noise adapter and flow map}
 
-\subsection{Mixed Objective}
+% \chapter{Related Work}
 
-\subsection{$\beta$-VAE}
+% \section{The Reward-tilted vector field}
 
-\subsection{Noise Augmentation}
+% \section{Estimating the Value Function with Flow models}
 
-\section{Building the noise adapter}
+% \subsubsection{Make the reward function robust to noise.}
 
-\subsection{Low-dimensional Toy Problems}
+% \subsubsection{Approximating the posterior as the mean}
 
-\subsection{Image-scale Problems}
+% \subsubsection{Monte Carlo approximation of the posterior}
 
-\section{Evaluation Framework}
+% \subsubsection{Sequential Monte Carlo}
 
-\subsubsection{Additional metrics for Low-dimensional experiments}
+% \subsection{Estimating the Value Function with Flow Maps}
 
-\subsubsection{Image-scale experiments}
+% \chapter{Method}
 
-\chapter{Experiments and Results}
+% \section{The noise adapter as a normalising flow}
 
-\section{2D Checkerboard Example}
+% \section{Training objectives}
 
-\subsection{The Data Distribution}
+% \subsection{Reverse KL}
 
-\subsection{Defining the Inverse Problem}
+% \subsection{Forward KL}
 
-\subsection{Base Flow Map Training}
+% \subsection{Mixed Objective}
 
-\subsection{Noise Adapter Training}
+% \subsection{$\beta$-VAE}
 
-\subsubsection{Normalising Flow Adapter}
+% \subsection{Noise Augmentation}
 
-\subsubsection{Gaussian Adapter with frozen $\theta$}
+% \section{Building the noise adapter}
 
-\subsubsection{VFM}
+% \subsection{Low-dimensional Toy Problems}
 
-\subsection{Results}
+% \subsection{Image-scale Problems}
 
-\section{Image Inverse Problems}
+% \section{Evaluation Framework}
 
-\subsection{Common Setup}
+% \subsubsection{Additional metrics for Low-dimensional experiments}
 
-\subsubsection{Base Flow Map}
+% \subsubsection{Image-scale experiments}
 
-\subsubsection{TarFlow Noise Adapter Hyperparameters}
+% \chapter{Experiments and Results}
 
-\subsection{Brightness Steering}
+% \section{2D Checkerboard Example}
 
-\subsubsection{Adapter Training}
+% \subsection{The Data Distribution}
 
-\subsubsection{Results}
+% \subsection{Defining the Inverse Problem}
 
-\subsection{Super-Resolution}
+% \subsection{Base Flow Map Training}
 
-\subsubsection{Noise Adapter Training details}
+% \subsection{Noise Adapter Training}
 
-\subsubsection{Objective Ablation}
+% \subsubsection{Normalising Flow Adapter}
 
-\subsubsection{Comparison with Baselines}
+% \subsubsection{Gaussian Adapter with frozen $\theta$}
 
-\subsection{Inpainting}
+% \subsubsection{VFM}
 
-\subsubsection{Noise Adapter Training details}
+% \subsection{Results}
 
-\subsubsection{$\beta$-VAE Ablation}
+% \section{Image Inverse Problems}
 
-\subsubsection{Comparison with Baselines}
+% \subsection{Common Setup}
 
-\subsubsection{Failure Analysis}
+% \subsubsection{Base Flow Map}
 
-\chapter{Conclusion}
+% \subsubsection{TarFlow Noise Adapter Hyperparameters}
 
-\section{Summary}
+% \subsection{Brightness Steering}
 
-\section{Future Work}
+% \subsubsection{Adapter Training}
 
-\section{Critical Evaluation}
+% \subsubsection{Results}
+
+% \subsection{Super-Resolution}
+
+% \subsubsection{Noise Adapter Training details}
+
+% \subsubsection{Objective Ablation}
+
+% \subsubsection{Comparison with Baselines}
+
+% \subsection{Inpainting}
+
+% \subsubsection{Noise Adapter Training details}
+
+% \subsubsection{$\beta$-VAE Ablation}
+
+% \subsubsection{Comparison with Baselines}
+
+% \subsubsection{Failure Analysis}
+
+% \chapter{Conclusion}
+
+% \section{Summary}
+
+% \section{Future Work}
+
+% \section{Critical Evaluation}
 
 \printbibliography[heading=bibintoc,title={Bibliography}]
 
