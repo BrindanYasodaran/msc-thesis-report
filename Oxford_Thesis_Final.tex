@@ -314,7 +314,7 @@ This chapter introduces the background required to understand the proposed metho
 \section{Generative Modelling}
 Suppose we wish to generate examples of a particular class of object. This class may be defined as broadly or narrowly as we like. We restrict our attention to objects that can be represented as vectors $\mathbf{x}\in\mathbb{R}^{D}$. In generative modelling, we assume that there exists a target probability distribution $p_{\mathrm{target}}(\mathbf{x})$ which places high density on vectors corresponding to plausible examples of the specified class of object. The goal of generative modelling is to learn an algorithm that can produce samples from this target distribution.
 
-Often, the target distribution is a data distribution $p_{\mathrm{data}}(\mathbf{x})$ over, for example, images, videos or molecular structures. In this setting, we typically have access to a finite dataset $\mathcal{D}=\{\mathbf{x}^{(i)}\}_{i=1}^{N}$ of samples from the data distribution. Using this dataset, the aim is to learn a model distribution $p_{\theta}(\mathbf{x})$ that approximates $p_{\mathrm{data}}(\mathbf{x})$. Depending on the generative modelling method, it may support sampling from $p_{\theta}(\mathbf{x})$, evaluating its density, or both. 
+Often, the target distribution is a data distribution $p_{\mathrm{data}}(\mathbf{x})$ over, for example, images, videos or molecular structures. In this setting, we typically have access to a finite dataset $\mathcal{D}=\{\mathbf{x}^{(i)}\}_{i=1}^{N}$ of samples from the data distribution. Using this dataset, the aim is to learn a model distribution $p_{\theta}(\mathbf{x})$ that approximates $p_{\mathrm{data}}(\mathbf{x})$. Depending on the generative modelling algorithm, it may support sampling from $p_{\theta}(\mathbf{x})$, evaluating its density, or both. 
 
 Many generative models, such as generative adversarial networks (GANs) \parencite{GAN} and the flow-based generative models \parencite{NF_survey,lipman_FM,geng2025meanflowsonestepgenerative} considered in this thesis, generate data by first drawing noise $\mathbf{z}\sim p_{\mathrm{base}}$ from a simple base distribution and then transforming it into a data sample $\mathbf{x}$. The learned transformation should induce a model distribution $p_{\theta}(\mathbf{x})$ that approximates the target distribution. 
 
@@ -416,26 +416,452 @@ For the inverse problems defined above, $p(\mathbf{y}\mid\mathbf{x})$ is the lik
 \section{Flow-Based Generative Modelling}
 Flow-based generative models transform samples from a tractable base distribution $p_{\mathrm{base}}(\mathbf{z})$ into samples from a target distribution $p_{\mathrm{target}}(\mathbf{x})$. Normalising flows represent this transformation as a finite composition of invertible maps \parencite{NF_survey}. Flow models and flow maps represent it as a continuous transformation governed by an ODE. While flow models learn the vector field defining the ODE \parencite{lipman_FM,mit_FM}, flow maps instead aim to directly learn the integral of the ODE \parencite{sander_MF}.
 
-These models play different roles in this thesis. A pretrained flow map acts as the generative model that maps noise to data, while a normalising flow is later used as the noise adapter. Flow models provide the continuous-time framework from which flow maps are defined.
+These models play different roles in this thesis. A pretrained flow map acts as the generative model that maps noise to data. Whereas we use a normalising flow to learn a conditional distribution over the noise space of the flow model (i.e. the noise adapter). Flow models provide the continuous-time transport framework from which flow maps are defined.
 
 \subsection{Normalising Flows}
-We now give an overview of normalising flows because noise adapter in our method is chosen to be a normalising flow. We make this choice because normalising flows can represent complex distributions while supporting both sampling and exact density evaluation, enabling variational training. We first define normalising flows and explain how their densities are evaluated. We then introduce autoregressive flows which is the specific variation of normalising flows which we use in the thesis. Finally we explain how normalising flows can be learned using forward or reverse KL divergence objectives. 
+% We now give an overview of normalising flows because noise adapter in our method is chosen to be a normalising flow. We make this choice because normalising flows can represent complex distributions while supporting both sampling and exact density evaluation, enabling variational training of the noise adapter. 
+We first define normalising flows and explain how their densities are evaluated. We then introduce autoregressive flows, which are the specific variation of normalising flows that we use to implement the noise adapter. Finally we explain how normalising flows can be learned using forward or reverse KL divergence objectives. 
 
 \subsubsection{Definition and Change of Variables}
+Suppose we wish to model a target distribution $p_{\mathrm{target}}(\mathbf{x})$. A normalising flow begins with a simple base distribution $p_{\mathrm{base}}(\mathbf{z})$ from which we can easily sample and whose density can be evaluated exactly. It then learns a transformation $T_{\phi}:\mathbb{R}^{D}\rightarrow\mathbb{R}^{D}$ that maps samples from this base distribution to samples whose distribution approximates the target distribution. More precisely, samples are generated according to
+\begin{equation}
+\mathbf{z}
+\sim
+p_{\mathrm{base}}(\mathbf{z})
+\qquad
+\mathbf{x}
+=
+T_{\phi}(\mathbf{z})
+\qquad
+\mathbf{x}
+\sim
+p_{\phi}(\mathbf{x})
+\label{eq:normalising_flow_transformation}
+\end{equation}
+and the parameters $\phi$ of the transformation are learned such that $p_{\phi}(\mathbf{x})$ approximates $p_{\mathrm{target}}(\mathbf{x})$ \parencite{NF_survey}.
 
+The defining property of a normalising flow is that $T_{\phi}$ is invertible and continuously differentiable, and that its inverse is also continuously differentiable. Such a transformation is known as a diffeomorphism. Invertibility allows samples to be mapped in both directions between the base and model spaces. Given $\mathbf{z}\sim p_{\mathrm{base}}$, a sample from $p_{\phi}$ is generated by evaluating the forward transformation $\mathbf{x}=T_{\phi}(\mathbf{z})$. Conversely, a data point $\mathbf{x}$ can be mapped to its unique corresponding base point $\mathbf{z}=T_{\phi}^{-1}(\mathbf{x})$.
 
+Because $T_{\phi}$ is a diffeomorphism, the density of $p_{\phi}$ is well-defined and can be evaluated using the change-of-variables formula
+\begin{equation}
+p_{\phi}(\mathbf{x})
+=
+p_{\mathrm{base}}\left(
+T_{\phi}^{-1}(\mathbf{x})
+\right)
+\left|
+\det
+\frac{
+\partial T_{\phi}^{-1}(\mathbf{x})
+}{
+\partial \mathbf{x}
+}
+\right|
+\label{eq:normalising_flow_change_of_variables}
+\end{equation}
+To evaluate the density according to Equation~\ref{eq:normalising_flow_change_of_variables}, the inverse transformation must not only exist but also be computationally tractable. Intuitively, Equation~\ref{eq:normalising_flow_change_of_variables} states that in order to compute the density of $\mathbf{x} \sim p_{\phi}$, first consider mapping $\mathbf{x}$ back to its corresponding base point $\mathbf{z}=T_{\phi}^{-1}(\mathbf{x})$. Subsequently, the density at $\mathbf{x}$ is equal to the base density at $\mathbf{z}$, weighted according to the local change in volume produced by $T_{\phi}$. If $T_{\phi}$ expands the space around $\mathbf{z}$, the same probability mass is spread across a larger region and the density decreases. If it contracts the space, the density increases.
 
+When $\mathbf{x}$ has been generated from a known base point $\mathbf{z}$, the same density can instead be evaluated using the Jacobian of the forward transformation
+\begin{equation}
+p_{\phi}(\mathbf{x})
+=
+p_{\mathrm{base}}(\mathbf{z})
+\left|
+\det
+\frac{
+\partial T_{\phi}(\mathbf{z})
+}{
+\partial \mathbf{z}
+}
+\right|^{-1}
+\qquad
+\mathbf{x}
+=
+T_{\phi}(\mathbf{z})
+\label{eq:normalising_flow_forward_change_of_variables}
+\end{equation}
+This form avoids evaluating $T_{\phi}^{-1}$ because the corresponding base point $\mathbf{z}$ is already known, and will be useful when deriving the reverse-KL training objective later. 
 
-
+To summarise, a normalising flow supports both sampling and exact density evaluation. Sampling requires drawing $\mathbf{z}\sim p_{\mathrm{base}}$ and evaluating $T_{\phi}(\mathbf{z})$. Evaluating the density at a given data point $\mathbf{x}$ requires computing $T_{\phi}^{-1}(\mathbf{x})$ and the corresponding Jacobian determinant. For an unrestricted $D\times D$ Jacobian, computing this determinant requires $\mathcal{O}(D^3)$ operations. Normalising-flow architectures must therefore choose the functional form of $T_\phi$ so that it remains expressive and invertible while its inverse and Jacobian determinant can be evaluated efficiently. 
 
 \subsubsection{Constructing Expressive and Tractable Flows}
+In practice, the transformation $T_{\phi}$ is parameterised by a neural network. 
+However, an arbitrary neural network is not guaranteed to be invertible or to have a tractable Jacobian determinant. Restrictions must therefore be placed on the functional form of $T_{\phi}$ to ensure these properties are satisfied, without limiting its ability to represent a complex target distribution.
 
-\subsubsection{Autoregressive Normalising Flows}
+A common approach is to construct $T_{\phi}$ as a composition of $L$ relatively simple invertible transformations, which we refer to as flow layers
+\begin{equation}
+T_{\phi}
+=
+T_{\phi_L}
+\circ
+T_{\phi_{L-1}}
+\circ
+\cdots
+\circ
+T_{\phi_1}
+\label{eq:NF_composition}
+\end{equation}
+where $\phi=(\phi_1,\ldots,\phi_L)$. Starting from $\mathbf{z}_0=\mathbf{z}$, each flow layer is applied in turn according to $\mathbf{z}_{\ell} =
+T_{\phi_\ell}(\mathbf{z}_{\ell-1})$, with $\mathbf{z}_L=\mathbf{x}$. It can be proved that if every layer is a diffeomorphism, their composition is also a diffeomorphism.
+Furthermore, the inverse transformation $T_{\phi}^{-1}$ can be computed by applying the inverse of each layer in reverse order.
+
+Given this composition~\ref{eq:NF_composition}, the overall Jacobian determinant of $T_{\phi}$ can be simply decomposed into the determinants of the individual layers. Let $J_{T_{\phi_\ell}}(\mathbf{z}_{\ell-1})$ denote the Jacobian of layer $T_{\phi_\ell}$ evaluated at its input. The chain rule gives
+\begin{equation}
+    \log
+    \left|
+        \det
+        J_{T_{\phi}}(\mathbf{z})
+    \right|
+    =
+    \sum_{\ell=1}^{L}
+    \log
+    \left|
+        \det
+        J_{T_{\phi_\ell}}(\mathbf{z}_{\ell-1})
+    \right|
+    \label{eq:NF_logdet_composition}
+\end{equation}
+where we have taken the logarithm of the Jacobian determinant to covert the product of the layerwise determinants into a sum. 
+Now, if the inverse and Jacobian determinant of each layer can be evaluated efficiently, the same is therefore true of the overall flow. At the same time, composing several simple layers can produce a significantly more expressive transformation than any individual layer, while the cost of evaluating the log-determinant grows only linearly with the number of layers \parencite{NF_survey}. 
+
+Several approaches have been developed for constructing flow layers that are invertible, expressive and with cheap Jacobian determinant. These include autoregressive flows, linear flows and residual flows \parencite{NF_survey}. We focus on autoregressive flows because they have been shown to scale effectively to generative modelling for high-dimensional data, including images \parencite{TarFlow}.
+
+\subsubsection{Autoregressive Flow Layers}
+Consider a single flow layer $T_{\phi_\ell}$. To simplify notation,
+denote its input by $\mathbf{z}\in\mathbb{R}^{D}$ and its output by
+$\mathbf{z}'=T_{\phi_\ell}(\mathbf{z})\in\mathbb{R}^{D}$.
+An autoregressive flow layer splits the coordinates of $\mathbf{z}$
+into $K$ equal-sized blocks
+$\mathbf{z}_1,\ldots,\mathbf{z}_K$. The output $\mathbf{z}'$ is split
+into corresponding blocks
+$\mathbf{z}'_1,\ldots,\mathbf{z}'_K$. Each output block
+$\mathbf{z}'_i$ is obtained by applying an elementwise transformation
+to the corresponding input block $\mathbf{z}_i$. The parameters of
+this transformation may depend only on the preceding input blocks
+$\mathbf{z}_{<i}=(\mathbf{z}_1,\ldots,\mathbf{z}_{i-1})$. In
+particular,
+\begin{equation}
+\mathbf{z}'_i
+=
+\tau\left(\mathbf{z}_i;\mathbf{h}_i\right)
+\qquad
+\mathbf{h}_i
+=
+c_i\left(\mathbf{z}_{<i}\right)
+\qquad
+i=1,\ldots,K
+\label{eq:autoregressive_flow_layer}
+\end{equation}
+The function $\tau$, called the transformer, performs the elementwise
+transformation of $\mathbf{z}_i$. Its parameters $\mathbf{h}_i$ are
+predicted by the $i$th conditioner $c_i$, which is typically
+implemented using a neural network. Here, transformer refers to the
+function that transforms each block, rather than the Transformer
+neural-network architecture.
+
+In order for the autoregressive flow layer is invertible, the
+transformer $\tau$ must be invertible with respect to
+$\mathbf{z}_i$ when its parameters $\mathbf{h}_i$ are fixed. 
+This can be achieved by ensuring the transformer is a strictly monotomic funciton of $\mathbf{z}_i$. 
+However, we do not require that the conditioner is invertible. 
+
+We now give an inductive argument for why the layer constructed above
+is invertible. Suppose that $\mathbf{z}'$ is given and we wish to
+recover $\mathbf{z}$. 
+The parameters
+$\mathbf{h}_1=c_1(\emptyset)$ can be computed immediately because
+they do not depend on any input blocks. The first input block can
+therefore be recovered as
+$\mathbf{z}_1
+=
+\tau^{-1}\left(\mathbf{z}'_1;\mathbf{h}_1\right)$
+Now assume that the first $i-1$ input blocks
+$\mathbf{z}_{<i}$ have been recovered. These blocks can be used to
+compute the parameters
+$\mathbf{h}_i=c_i(\mathbf{z}_{<i})$. The $i$th input block can then
+be recovered as
+$\mathbf{z}_i
+=
+\tau^{-1}\left(\mathbf{z}'_i;\mathbf{h}_i\right)$
+By induction, every input block can be recovered in this way.
+Therefore, $T_{\phi_\ell}$ is invertible. 
+Importantly, note that evaluating
+$T_{\phi_\ell}^{-1}$ must be performed iteratively in $K$ sequential steps, first computing $\mathbf{z}_1$ before $\mathbf{z}_2$ and so on until $\mathbf{z}_K$. Each step requires evaluating both the conditioner and the transformer. 
+
+Having established that the layer is invertible, we now show that its
+Jacobian determinant can be evaluated efficiently. Since the
+transformer $\tau$ acts elementwise, each coordinate in the output block
+$\mathbf{z}'_i$ depends only on the corresponding coordinate in
+$\mathbf{z}_i$ (and on the preceding input blocks
+$\mathbf{z}_{<i}$). Importantly, each coordinate in the output
+$\mathbf{z}'_i$ does not depend on any later coordinates of the input. 
+The Jacobian of the layer is therefore lower-triangular. 
+Because the determinant of any triangular matrix is simply the product of its diagonal entries, the log-determinant of $T_{\phi_\ell}$ can be computed in $\mathcal{O}(D)$ time \parencite{NF_survey}. 
+
+\subsubsection{Computational Direction: IAF and MAF}
+Recall that sampling from a normalising flow consists of applying each layer $T_{\phi_\ell}$ in order, transforming the base sample $\mathbf{z}$ to $\mathbf{x}$. 
+By contrast, evaluating the
+density of a given point $\mathbf{x}$ using the change-of-variables
+formula~\ref{eq:normalising_flow_change_of_variables} requires applying the inverse layers
+$T_{\phi_L}^{-1},\ldots,T_{\phi_1}^{-1}$. 
+In the
+previous subsection, we showed that evaluating the inverse of a single
+autoregressive layer $T_{\phi_\ell}^{-1}$ requires $K$ sequential
+steps.
+
+We now show that the forward transformation
+$\mathbf{z}'=T_{\phi_\ell}(\mathbf{z})$ does not need to be evaluated
+sequentially. 
+Given $\mathbf{z}$, all input blocks
+$\mathbf{z}_1,\ldots,\mathbf{z}_K$ are already known. 
+Since each
+$\mathbf{h}_i$ depends only on the input blocks
+$\mathbf{z}_{<i}$, all parameters
+$\mathbf{h}_1,\ldots,\mathbf{h}_K$ can be computed simultaneously.
+In practice, a single neural network takes the complete vector
+$\mathbf{z}$ as input and produces all of these parameters in one
+forward pass. The connections of this neural network are masked to ensure that each output
+$\mathbf{h}_i$ cannot depend on the input blocks
+$\mathbf{z}_{\geq i}$
+\parencite{germain2015mademaskedautoencoderdistribution}. Once all
+parameters $\mathbf{h}_1,\ldots,\mathbf{h}_K$ are known, every output
+block $\mathbf{z}'_i
+=
+\tau\left(\mathbf{z}_i;\mathbf{h}_i\right)$
+can also be computed simultaneously. Therefore, all blocks of
+$\mathbf{z}' = T_{\phi_\ell}(\mathbf{z})$ can be evaluated in parallel, whereas the
+blocks of $\mathbf{z}=T_{\phi_\ell}^{-1}(\mathbf{z}')$ must be recovered
+sequentially.
+
+
+In practice, this means that sampling, which evaluates
+$\mathbf{z}'=T_{\phi_\ell}(\mathbf{z})$, is comparatively
+inexpensive, whereas density evaluation, which requires
+$\mathbf{z}=T_{\phi_\ell}^{-1}(\mathbf{z}')$, is more expensive.
+If an application instead prioritises fast density evaluation, we can
+define the autoregressive flow layer such that the parameters
+$\mathbf{h}_i$ are computed as a function of the output blocks
+$\mathbf{z}'_{<i}$ rather than the input blocks
+$\mathbf{z}_{<i}$. In particular, we define
+$\mathbf{h}_i=c_i(\mathbf{z}'_{<i})$. This change preserves the
+invertibility and tractable lower-triangular Jacobian of the layer.
+However, computing all blocks of $\mathbf{z}'=T_{\phi_\ell}(\mathbf{z})$ now
+requires $K$ sequential steps, whereas computing all blocks of 
+$\mathbf{z}=T_{\phi_\ell}^{-1}(\mathbf{z}')$ can be parallelised.
+
+When the parameters $\mathbf{h}_i$ are computed from the input blocks
+$\mathbf{z}_{<i}$, the layer is known as an inverse autoregressive
+flow (IAF)
+\parencite{kingma2017improvingvariationalinferenceinverse}. When they
+are instead computed from the output blocks $\mathbf{z}'_{<i}$, the
+layer is known as a masked autoregressive flow (MAF)
+\parencite{papamakarios2018maskedautoregressiveflowdensity}. IAF
+provides fast sampling, whereas MAF
+provides fast density evaluation.
 
 \subsubsection{Transformer Autoregressive Flows}
+We now introduce the normalising-flow architecture used to represent
+the noise adapter in this project: Transformer Autoregressive Flow
+(TarFlow) \parencite{TarFlow}. TarFlow constructs the overall
+normalising flow as a composition of $L$ masked autoregressive flow
+layers. It adapts the original MAF architecture
+\parencite{papamakarios2018maskedautoregressiveflowdensity} to better model distributions over images. It achieves this through four main design
+choices. We explain each of these choices in turn.
+
+The first design choice determines how the image-shaped variable $\mathbf{z}$ is
+divided into the $K$ blocks $\mathbf{z}_1,\ldots,\mathbf{z}_K$.
+Let $\mathbf{z}\in\mathbb{R}^{C\times H\times W}$, where $C$, $H$
+and $W$ denote the number of channels, height and width. Given a patch
+size $P$, TarFlow divides the $H\times W$ spatial grid into
+$H/P$ rows and $W/P$ columns of non-overlapping $P\times P$ patches.
+Each patch spans all $C$ channels and therefore contains $CP^2$
+coordinates. TarFlow flattens each patch to form a single block, which
+it refers to as a token. This produces
+$K=(H/P)(W/P)$ tokens, initially ordered by scanning the image from
+left to right and top to bottom.
+
+The second design choice specifies the transformer $\tau$ applied to
+each token. TarFlow uses the elementwise affine transformation
+\begin{equation}
+\tau\left(\mathbf{z}_i;\mathbf{h}_i\right)
+=
+\exp\left(\boldsymbol{\alpha}_i\right)
+\odot
+\mathbf{z}_i
++
+\boldsymbol{\beta}_i
+\qquad
+\mathbf{h}_i
+=
+\left(
+\boldsymbol{\alpha}_i,
+\boldsymbol{\beta}_i
+\right)
+\label{eq:tarflow_affine_transformer}
+\end{equation}
+where
+$\boldsymbol{\alpha}_i,\boldsymbol{\beta}_i
+\in\mathbb{R}^{CP^2}$ and $\odot$ denotes elementwise multiplication.
+The exponential ensures that every scale is positive, so the
+transformation is invertible.
+
+The third design choice specifies the conditioner $c_i$. Recall that,
+in a masked autoregressive flow, the transformation parameters are
+computed via $\mathbf{h}_i=c_i(\mathbf{z}'_{<i})$. TarFlow uses a
+single causal Transformer neural network to compute
+$\mathbf{h}_1,\ldots,\mathbf{h}_K$. Each token $\mathbf{z}'_i$ is
+first projected from dimension $CP^2$ to the hidden dimension of the
+Transformer, and a learned positional embedding is added. The
+resulting sequence is then processed by a stack of Transformer layers.
+Each layer contains a causal multi-head self-attention layer followed
+by a multilayer perceptron layer. The causal attention mask prevents
+each token from attending to later tokens. A final linear projection
+maps each token embedding to the affine parameters
+$(\boldsymbol{\alpha}_i,\boldsymbol{\beta}_i)$. 
+
+The fourth design choice concerns the token ordering. TarFlow reverses
+the order of the tokens between successive flow layers, so that tokens
+which appear early in one layer appear late in the next. Together, these design choices result in a scalable normalising flow architecture for modelling image distributions. In our image inverse problem experiments, we choose TarFlow to implement our noise adapter because the noise adapter models a distribution over the image-shaped noise space of a flow map. 
 
 \subsubsection{Training Normalising Flows}
+So far, we have described how to construct a normalising flow
+$T_{\phi}$ that induces a model distribution
+$p_{\phi}(\mathbf{x})$. We now discuss how to learn the parameters
+$\phi$ such that $p_{\phi}(\mathbf{x})$ approximates the target
+distribution $p_{\mathrm{target}}(\mathbf{x})$. A natural approach is
+to minimise the KL divergence between these distributions. Since the
+KL divergence is asymmetric, we may minimise either the forward KL
+divergence
+$D_{\mathrm{KL}}(p_{\mathrm{target}}\Vert p_{\phi})$ or the reverse
+KL divergence
+$D_{\mathrm{KL}}(p_{\phi}\Vert p_{\mathrm{target}})$.
 
+We first define the forward KL loss as
+\begin{align}
+\mathcal{L}_{\mathrm{fKL}}(\phi)
+&:=
+D_{\mathrm{KL}}
+\left(
+p_{\mathrm{target}}
+\parallel
+p_{\phi}
+\right)
+\nonumber
+\\
+&=
+\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+\left[
+\log
+\frac{
+p_{\mathrm{target}}(\mathbf{x})
+}{
+p_{\phi}(\mathbf{x})
+}
+\right]
+\nonumber
+\\
+&=
+-
+\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+\left[
+\log p_{\phi}(\mathbf{x})
+\right]
++
+\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+\left[
+\log p_{\mathrm{target}}(\mathbf{x})
+\right]
+\nonumber
+\\
+&=
+-
+\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+\left[
+\log p_{\phi}(\mathbf{x})
+\right]
++
+\mathrm{const}
+\label{eq:normalising_flow_forward_kl}
+\end{align}
+The final term is constant with respect to $\phi$. Minimising
+$\mathcal{L}_{\mathrm{fKL}}$ is therefore equivalent to maximising the
+expected log-likelihood assigned by the normalising flow to samples
+from the target distribution. This is precisely maximum-likelihood training.
+It requires samples from $p_{\mathrm{target}}$ and the ability to
+evaluate $T_{\phi}^{-1}$ and its Jacobian determinant through the
+change-of-variables formula
+\ref{eq:normalising_flow_change_of_variables}. It does not require
+evaluating the density of $p_{\mathrm{target}}$.
+
+We next define the reverse KL loss as
+\begin{equation}
+\mathcal{L}_{\mathrm{rKL}}(\phi)
+:=
+D_{\mathrm{KL}}
+\left(
+p_{\phi}
+\parallel
+p_{\mathrm{target}}
+\right)
+=
+\mathbb{E}_{\mathbf{x}\sim p_{\phi}}
+\left[
+\log p_{\phi}(\mathbf{x})
+-
+\log p_{\mathrm{target}}(\mathbf{x})
+\right]
+\label{eq:normalising_flow_reverse_kl}
+\end{equation}
+The expectation in
+Equation~\ref{eq:normalising_flow_reverse_kl} is taken over
+$\mathbf{x}\sim p_{\phi}$. Since $p_{\phi}$ is obtained by
+transforming the base distribution through $T_{\phi}$, the standard
+reparameterisation trick \parencite{pml2Book} allows this expectation
+to be rewritten over $\mathbf{z}\sim p_{\mathrm{base}}$. Substituting
+the forward change-of-variables formula
+\ref{eq:normalising_flow_forward_change_of_variables} then gives
+\begin{align}
+\mathcal{L}_{\mathrm{rKL}}(\phi)
+&=
+\mathbb{E}_{\mathbf{z}\sim p_{\mathrm{base}}}
+\left[
+\log p_{\phi}
+\left(
+T_{\phi}(\mathbf{z})
+\right)
+-
+\log p_{\mathrm{target}}
+\left(
+T_{\phi}(\mathbf{z})
+\right)
+\right]
+\nonumber
+\\
+&=
+\mathbb{E}_{\mathbf{z}\sim p_{\mathrm{base}}}
+\left[
+\log p_{\mathrm{base}}(\mathbf{z})
+-
+\log
+\left|
+\det J_{T_{\phi}}(\mathbf{z})
+\right|
+-
+\log p_{\mathrm{target}}
+\left(
+T_{\phi}(\mathbf{z})
+\right)
+\right]
+\label{eq:normalising_flow_reverse_kl_reparameterised}
+\end{align}
+Equation~\ref{eq:normalising_flow_reverse_kl_reparameterised} shows
+that reverse-KL training requires sampling from
+$p_{\mathrm{base}}$, evaluating $T_{\phi}$ and its Jacobian
+determinant, and evaluating the target density at the generated
+sample. Unlike forward-KL training, it does not require samples from
+$p_{\mathrm{target}}$. Furthermore, an unnormalised target density is
+sufficient because its unknown normalising constant is independent of
+$\phi$ and therefore does not affect optimisation.
 
 
 
