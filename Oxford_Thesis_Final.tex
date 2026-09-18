@@ -516,23 +516,7 @@ T_{\phi_1}
 \end{equation}
 where $\phi=(\phi_1,\ldots,\phi_L)$. Starting from $\mathbf{z}_0=\mathbf{z}$, each layer is applied in turn as $\mathbf{z}_{\ell}=T_{\phi_\ell}(\mathbf{z}_{\ell-1})$, with $\mathbf{z}_L=\mathbf{x}$. Importantly, a composition of diffeomorphisms is itself a diffeomorphism, whose inverse is obtained by applying the inverse layers in reverse order.
 
-Given this composition~\ref{eq:NF_composition}, the overall Jacobian determinant of $T_{\phi}$ can be simply decomposed into the determinants of the individual layers. Let $J_{T_{\phi_\ell}}(\mathbf{z}_{\ell-1})$ denote the Jacobian of layer $T_{\phi_\ell}$ evaluated at its input. The chain rule gives
-\begin{equation}
-    \log
-    \left|
-        \det
-        J_{T_{\phi}}(\mathbf{z})
-    \right|
-    =
-    \sum_{\ell=1}^{L}
-    \log
-    \left|
-        \det
-        J_{T_{\phi_\ell}}(\mathbf{z}_{\ell-1})
-    \right|
-    \label{eq:NF_logdet_composition}
-\end{equation}
-where taking the logarithm converts the product of layerwise determinants into a sum. Hence, if each layer has an efficient inverse and Jacobian determinant, so does the overall flow. Stacking more layers increases the expressiveness of $T_{\phi}$, while the cost of evaluating its log-determinant grows only linearly with $L$ \parencite{NF_survey}.
+By the chain rule, the Jacobian determinant of this composition is the product of the Jacobian determinants of its layers, so its log-determinant is the sum of the layers' log-determinants. Hence, if each layer has an efficient inverse and Jacobian determinant, so does the overall flow. Stacking more layers increases the expressiveness of $T_{\phi}$, while the cost of evaluating its log-determinant grows only linearly with $L$ \parencite{NF_survey}.
 
 Several approaches have been developed for constructing flow layers that are invertible, expressive and with cheap Jacobian determinant. These include autoregressive flows, linear flows and residual flows \parencite{NF_survey}. We focus on autoregressive flows because they have been shown to scale effectively to generative modelling for high-dimensional data, including images \parencite{TarFlow}.
 
@@ -572,9 +556,9 @@ neural-network architecture.
 
 For the layer to be invertible, the transformer $\tau$ must be invertible with respect to $\mathbf{z}_i$ when its parameters $\mathbf{h}_i$ are fixed. This is achieved by making $\tau$ strictly monotonic in $\mathbf{z}_i$. The conditioners, by contrast, need not be invertible.
 
-Under these conditions, $\mathbf{z}$ can be recovered from $\mathbf{z}'$ one block at a time. The first block is recovered as $\mathbf{z}_1=\tau^{-1}(\mathbf{z}'_1;\mathbf{h}_1)$, since $\mathbf{h}_1=c_1(\emptyset)$ depends on no input blocks. Once $\mathbf{z}_{<i}$ has been recovered, the parameters $\mathbf{h}_i=c_i(\mathbf{z}_{<i})$ can be computed, and hence $\mathbf{z}_i=\tau^{-1}(\mathbf{z}'_i;\mathbf{h}_i)$. Importantly, evaluating $T_{\phi_\ell}^{-1}$ therefore requires $K$ sequential steps, each of which evaluates both the conditioner and the transformer \parencite{NF_survey}.
+Under these conditions, the layer can be inverted block by block: $\mathbf{h}_1$ depends on no input blocks, so $\mathbf{z}_1=\tau^{-1}(\mathbf{z}'_1;\mathbf{h}_1)$, and each subsequent $\mathbf{z}_i$ can be recovered once $\mathbf{z}_{<i}$ is known \parencite{NF_survey}. Inverting $T_{\phi_\ell}$ therefore requires $K$ sequential steps, each evaluating the conditioner and the transformer.
 
-Having established that the layer is invertible, we now show that its Jacobian determinant can be evaluated efficiently. Since $\tau$ acts elementwise, each coordinate of the output block $\mathbf{z}'_i$ depends only on the corresponding coordinate of $\mathbf{z}_i$ and on the preceding blocks $\mathbf{z}_{<i}$, and never on later coordinates of the input. The Jacobian of the layer is therefore lower-triangular. Its determinant is therefore the product of the diagonal entries, so the log-determinant of $T_{\phi_\ell}$ is a sum of $D$ terms, computable in $\mathcal{O}(D)$ time \parencite{NF_survey}. This matters for the noise adapter, whose noise space has the dimension of an image, $D=3072$ for CIFAR-10, where an $\mathcal{O}(D^3)$ determinant at every training step would be prohibitive.
+Because $\tau$ acts elementwise and $\mathbf{h}_i$ depends only on $\mathbf{z}_{<i}$, each output block depends only on its own input block and the preceding ones, so the Jacobian of the layer is lower-triangular. Its log-determinant is therefore a sum of $D$ diagonal terms, computable in $\mathcal{O}(D)$ time \parencite{NF_survey}. This matters for the noise adapter, whose noise space has dimension $D=3072$ for CIFAR-10, where an $\mathcal{O}(D^3)$ determinant at every training step would be prohibitive.
 
 \subsubsection{Computational Direction: IAF and MAF}
 \label{subsubsec:computational_direction_iaf_and_maf}
@@ -663,59 +647,46 @@ So far, we have described how to construct a normalising flow $T_{\phi}$ that in
 We first define the forward KL loss as
 \begin{align}
 \mathcal{L}_{\mathrm{fKL}}(\phi)
-&:=
-D_{\mathrm{KL}}
-\left(
-p_{\mathrm{target}}
-\parallel
-p_{\phi}
-\right)
-\nonumber
-\\
+:=
+D_{\mathrm{KL}}\left(p_{\mathrm{target}}\parallel p_{\phi}\right)
 &=
 \mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
 \left[
-\log
-\frac{
-p_{\mathrm{target}}(\mathbf{x})
-}{
-p_{\phi}(\mathbf{x})
-}
+\log\frac{p_{\mathrm{target}}(\mathbf{x})}{p_{\phi}(\mathbf{x})}
 \right]
 \nonumber
 \\
 &=
--
-\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
-\left[
-\log p_{\phi}(\mathbf{x})
-\right]
-+
-\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
-\left[
-\log p_{\mathrm{target}}(\mathbf{x})
-\right]
-\nonumber
-\\
-&=
--
-\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
-\left[
-\log p_{\phi}(\mathbf{x})
-\right]
+-\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+\left[\log p_{\phi}(\mathbf{x})\right]
 +
 \mathrm{const}
 \label{eq:normalising_flow_forward_kl}
 \end{align}
-The final term is constant with respect to $\phi$. Minimising
+
+% \begin{align}
+% \mathcal{L}_{\mathrm{fKL}}(\phi)
+% &:=
+% D_{\mathrm{KL}}\left(p_{\mathrm{target}}\parallel p_{\phi}\right)
+% =
+% \mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+% \left[
+% \log\frac{p_{\mathrm{target}}(\mathbf{x})}{p_{\phi}(\mathbf{x})}
+% \right]
+% \nonumber
+% \\
+% &=
+% -\mathbb{E}_{\mathbf{x}\sim p_{\mathrm{target}}}
+% \left[\log p_{\phi}(\mathbf{x})\right]
+% +
+% \mathrm{const}
+% \label{eq:normalising_flow_forward_kl}
+% \end{align}
+The constant is the expected log target density, which does not depend on $\phi$. Minimising
 $\mathcal{L}_{\mathrm{fKL}}$ is therefore equivalent to maximising the
 expected log-likelihood assigned by the normalising flow to samples
 from the target distribution. This is precisely maximum-likelihood training.
-It requires samples from $p_{\mathrm{target}}$ and the ability to
-evaluate $T_{\phi}^{-1}$ and its Jacobian determinant through the
-change-of-variables formula
-\ref{eq:normalising_flow_change_of_variables}. It does not require
-evaluating the density of $p_{\mathrm{target}}$.
+Estimating this loss requires samples $\mathbf{x}\sim p_{\mathrm{target}}$ and the ability to evaluate $p_{\phi}(\mathbf{x})$ at those samples. By the change-of-variables formula in Equation~\ref{eq:normalising_flow_change_of_variables}, evaluating $p_{\phi}(\mathbf{x})$ requires computing $T_{\phi}^{-1}(\mathbf{x})$ and its Jacobian determinant. Importantly, it does not require evaluating the target density $p_{\mathrm{target}}$.
 
 We next define the reverse KL loss as
 \begin{equation}
@@ -768,7 +739,12 @@ T_{\phi}(\mathbf{z})
 -
 \log
 \left|
-\det J_{T_{\phi}}(\mathbf{z})
+\det
+\frac{
+\partial T_{\phi}(\mathbf{z})
+}{
+\partial \mathbf{z}
+}
 \right|
 -
 \log p_{\mathrm{target}}
@@ -788,6 +764,170 @@ sufficient because its unknown normalising constant is independent of
 $\phi$ and therefore does not affect optimisation \parencite{NF_survey}.
 
 The two objectives also behave differently when $p_{\mathrm{target}}$ is multimodal. Forward KL takes its expectation over $p_{\mathrm{target}}$, so any region where $p_{\mathrm{target}}$ has mass but $p_{\phi}$ assigns little density incurs a very large penalty $-\log p_{\phi}(\mathbf{x})$. Forward KL is therefore mode-covering: it forces $p_{\phi}$ to cover every mode, even at the cost of placing mass between modes. Reverse KL takes its expectation over $p_{\phi}$, so it penalises placing mass where $p_{\mathrm{target}}$ has none, but not missing a mode. Reverse KL is therefore mode-seeking, and often concentrates $p_{\phi}$ on a subset of the target's modes \parencite{BG}.
+
+\subsection{Flow Models and Flow Matching}
+\label{subsec:flow_models_and_flow_matching}
+Flow models describe the transformation from noise to data as a continuous-time process, rather than as a finite chain of invertible maps. Instead of learning the entire transformation at once, a flow model only needs to specify how a sample should move locally at each point in time. We index time by $t\in[0,1]$ and adopt the convention of MeanFlow \parencite{geng2025meanflowsonestepgenerative}: a sample is drawn from the base distribution at $t=1$ and is continuously transformed into a sample from the target distribution at $t=0$. The definitions and results in this subsection follow \textcite{mit_FM} and \textcite{lipman_FM}.
+
+\subsubsection{ODEs and Trajectories}
+\label{subsubsec:odes_and_trajectories}
+The local motion of a point is specified by a vector field $v:\mathbb{R}^{D}\times[0,1]\to\mathbb{R}^{D}$, which assigns a velocity $v(\mathbf{x},t)$ to every location $\mathbf{x}$ and time $t$. To describe how a point starting at $\mathbf{z}$ moves under this vector field, let $\mathbf{x}_t$ denote its location at time $t$. Its motion is governed by the ordinary differential equation (ODE)
+\begin{equation}
+\frac{\mathrm{d}\mathbf{x}_t}{\mathrm{d}t}
+=
+v(\mathbf{x}_t,t)
+\qquad
+\mathbf{x}_1=\mathbf{z}
+\label{eq:ode}
+\end{equation}
+which states that the point starts at $\mathbf{z}$ at time $t=1$ and, as $t$ decreases, always moves with the velocity that the vector field specifies at its current location and time. The resulting path $(\mathbf{x}_t)_{t\in[0,1]}$ is called a trajectory, and is the solution of the ODE.
+
+If $v$ is continuously differentiable with bounded derivatives, the Picard--Lindel\"of theorem guarantees that, for every starting point $\mathbf{z}$, exactly one trajectory satisfies Equation~\ref{eq:ode} \parencite{mit_FM}. Each starting point therefore determines a single unique trajectory, and hence a single end point $\mathbf{x}_0$. This uniqueness is what later makes flow maps well defined.
+
+\subsubsection{Flow Models}
+\label{subsubsec:flow_models}
+The ODE is deterministic, so randomness enters only through the starting point. We denote random variables by capital letters. Suppose the starting point is drawn at random, $\mathbf{X}_1\sim p_{\mathrm{base}}$, and then follows the vector field according to Equation~\ref{eq:ode}. For each $t$, its location $\mathbf{X}_t$ along the resulting trajectory is a deterministic function of the random starting point, and is therefore itself a random variable, with some distribution $p_t$. As $t$ decreases from 1 to 0, following the vector field therefore transports $p_1=p_{\mathrm{base}}$ through a continuous sequence of distributions $p_t$, ending at $p_0$.
+
+A flow model parameterises the vector field by a neural network $v_{\theta}$ with parameters $\theta$. Since our ultimate goal is to sample from $p_{\mathrm{target}}$, $\theta$ is learned so that the distribution of the end point $\mathbf{X}_0$, which we denote $p_{\theta}$, approximates $p_{\mathrm{target}}$. Following $v_{\theta}$ from fresh noise $\mathbf{X}_1\sim p_{\mathrm{base}}$ then produces new samples distributed according to an approximation of $p_{\mathrm{target}}$ at time $t=0$.
+
+\subsubsection{Sampling}
+\label{subsubsec:sampling}
+In practice, $v_{\theta}$ cannot be followed exactly, because the ODE has no closed-form solution when the vector field is a neural network. Instead, the trajectory is followed in discrete steps. The simplest scheme is Euler's method, which starts from $\mathbf{x}_1=\mathbf{z}$ with $\mathbf{z}\sim p_{\mathrm{base}}$, divides $[0,1]$ into $n$ steps of size $h=1/n$, and at each step moves the sample a short distance along its current velocity:
+\begin{equation}
+\mathbf{x}_{t-h}
+=
+\mathbf{x}_t-h\,v_{\theta}(\mathbf{x}_t,t)
+\qquad
+t=1,1-h,\ldots,h
+\label{eq:euler}
+\end{equation}
+The velocity is subtracted because time runs from $t=1$ to $t=0$. Smaller steps follow $v_{\theta}$ more accurately, but each step costs one network function evaluation (NFE), so accurate sampling can require many evaluations. This is the cost that flow maps are designed to remove.
+
+\subsubsection{Flow Matching}
+\label{subsubsec:flow_matching}
+We want to learn a vector field $v_{\theta}$ that transports $\mathbf{X}_1\sim p_{\mathrm{base}}$ to $\mathbf{X}_0\sim p_{\theta}$, such that $p_{\theta}$ approximates $p_{\mathrm{target}}$. However, this requirement only constrains the two ends of the transformation. Many different vector fields transport $p_{\mathrm{base}}$ to $p_{\mathrm{target}}$, and they differ in the intermediate distributions $p_t$ that the samples pass through on the way. Flow matching \parencite{lipman_FM} removes this ambiguity by explicitly constructing a target sequence of distributions $p_t$, called a probability path, together with a vector field that moves samples along it. That is, if we draw samples from $p_{\mathrm{base}}$ and follow this constructed vector field, the samples are distributed according to the constructed probability path $p_t$ at every time $t$. This constructed vector field is called the marginal vector field, and flow matching trains $v_{\theta}$ to match it.
+
+In the flow matching framework, constructing $p_t$ boils down to choosing a 'conditional probability path'. We choose the CondOT conditional probability path in this thesis, and refer to \textcite{mit_FM} for details regarding the exact construction of $p_t$. Given this choice, $p_t$ is very simple. A sample from $p_t$ is obtained by drawing a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$ independently, and taking the point a fraction $t$ of the way along the straight line from $\mathbf{x}_0$ to $\mathbf{x}_1$:
+\begin{equation}
+\mathbf{x}_t
+=
+(1-t)\,\mathbf{x}_0+t\,\mathbf{x}_1
+\label{eq:condot_interpolation}
+\end{equation}
+At $t=0$ this point is the data sample and at $t=1$ it is the noise sample, so $p_0=p_{\mathrm{target}}$ and $p_1=p_{\mathrm{base}}$, as required. Importantly, this straight line is only a way of drawing samples from $p_t$. It does not describe the trajectories of the marginal vector field, which are generally curved rather than straight.
+
+Having fixed $p_t$, flow matching trains $v_{\theta}$ using a simple regression objective. We sample a time $t\sim\mathcal{U}[0,1]$, a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$, construct $\mathbf{x}_t$ using Equation~\ref{eq:condot_interpolation}, and regress the output of the network at $\mathbf{x}_t$ against the velocity of the straight line, $\mathbf{x}_1-\mathbf{x}_0$:
+\begin{equation}
+\mathcal{L}_{\mathrm{FM}}(\theta)
+=
+\mathbb{E}_{t,\,\mathbf{x}_0,\,\mathbf{x}_1}
+\left\|
+v_{\theta}(\mathbf{x}_t,t)
+-
+(\mathbf{x}_1-\mathbf{x}_0)
+\right\|^2
+\label{eq:flow_matching_loss}
+\end{equation}
+In practice, this expectation is estimated by averaging over a minibatch of sampled triples $(t,\mathbf{x}_0,\mathbf{x}_1)$. Although the training algorithm is simple, showing that its minimiser is the marginal vector field is fairly involved. We refer readers to \textcite{mit_FM} and \textcite{lipman_FM} for the proof. 
+
+\subsection{Flow Maps}
+\label{subsec:flow_maps}
+Our presentation of flow maps follows \textcite{sander_MF} and \textcite{boffi2025flowmapmatchingstochastic}.
+
+\subsubsection{Motivation and Definition}
+\label{subsubsec:flow_map_definition}
+Recall from Section~\ref{subsubsec:sampling} that generating a sample with a flow model requires simulating a trajectory from noise to data in many small Euler steps, each of which requires one evaluation of the velocity network $v_\theta$. Sampling from a flow model is therefore expensive.
+
+Consider a point on a trajectory, at location $\mathbf{x}_s$ at time $s$. If we follow the vector field $v$ exactly from time $s$ to another time $t$, taking infinitesimally small steps along the trajectory, the point $\mathbf{x}_s$ is displaced by exactly the integral $\int_s^t v(\mathbf{x}_\tau,\tau)\,\mathrm{d}\tau$. By taking small steps in the direction output by the velocity network, as in Euler's method, we are effectively approximating this integral. This motivates training a neural network to learn the integral of the marginal vector field directly, rather than the vector field itself. In particular, we want to learn the flow map
+\begin{equation}
+F(\mathbf{x}_s,s,t)
+=
+\mathbf{x}_s+\int_{s}^{t}v(\mathbf{x}_\tau,\tau)\,\mathrm{d}\tau
+\label{eq:flow_map}
+\end{equation}
+which takes as input the location $\mathbf{x}_s$ of a point at time $s$ on a trajectory and outputs the location $\mathbf{x}_t$ at time $t$ on that same trajectory. If a neural network $F_{\theta}$ has been successfully trained to predict the flow map, we can draw $\mathbf{z}\sim p_{\mathrm{base}}$ and evaluate the one-step generator $G_{\theta}(\mathbf{z}):=F_{\theta}(\mathbf{z},1,0)$ to obtain a sample at $t=0$. Sampling therefore requires only a single forward pass of the network.
+
+\subsubsection{Well-Definedness and the Noise--Data Bijection}
+\label{subsubsec:flow_map_bijection}
+For the flow map to be a well-defined function, the inputs $\mathbf{x}_s$, $s$ and $t$ must determine exactly one output. Two things must therefore hold. First, the point $\mathbf{x}_s$ at time $s$ must lie on only one trajectory, since otherwise it would be unclear which trajectory to follow. Second, following that trajectory to time $t$ must lead to only one location. Both follow from the Picard--Lindel\"of theorem introduced in Section~\ref{subsubsec:odes_and_trajectories}. 
+
+A consequence of the Picard--Lindel\"of theorem is that the vector field $v$ defines a bijection between noise samples $\mathbf{z}\sim p_{\mathrm{base}}$ and target samples $\mathbf{x}\sim p_{\mathrm{target}}$. Intuitively, following the vector field from a noise sample $\mathbf{z}$ according to Equation~\ref{eq:ode} leads deterministically to exactly one target sample $\mathbf{x}$, and following it backwards in time from $\mathbf{x}$ leads back to exactly one noise sample, namely $\mathbf{z}$. VFM relies on this bijection: it pulls a conditional distribution over data back into noise space via the deterministic vector field. Because the pairing between noise and target samples is one to one, this procedure gives a well-defined distribution over noise. This would not be the case for diffusion models, whose sampling procedure is stochastic.
+
+\subsubsection{Training Flow Maps with MeanFlow}
+\label{subsubsec:meanflow}
+Training a flow map is harder than training a flow model. A flow model describes the paths between noise and data only locally, through the velocity at each point, whereas a flow map must describe them globally, through the displacement between any two points on the same path \parencite{sander_MF}.
+
+The predominant methods for training flow maps are derived from a simple rule that any valid flow map must satisfy, such as the Eulerian or Lagrangian consistency rule \parencite{sander_MF,boffi2025flowmapmatchingstochastic}. These rules relate the flow map to the underlying marginal vector field $v$, so the training objectives derived from them require access to $v$. Methods differ in how $v$ is provided. Distillation methods first train a flow model and use it to provide $v$ \parencite{song2023consistencymodels,boffi2025buildconsistencymodellearning}, whereas more recent methods avoid the need for a pretrained flow model and train the flow map from scratch.
+
+MeanFlow \parencite{geng2025meanflowsonestepgenerative} is one such method. Its training objective, which we denote $\mathcal{L}_{\mathrm{MF}}$, is derived from the Eulerian consistency rule, and we give the derivation in Appendix~\ref{sec:meanflow_appendix}. The derivation relies on an alternative parameterisation of the flow map, through the average velocity over the interval from $s$ to $t$:
+\begin{align}
+V(\mathbf{x}_s,s,t)
+&=
+\frac{1}{t-s}\int_{s}^{t}v(\mathbf{x}_\tau,\tau)\,\mathrm{d}\tau
+\label{eq:average_velocity}
+\\
+F(\mathbf{x}_s,s,t)
+&=
+\mathbf{x}_s+(t-s)\,V(\mathbf{x}_s,s,t)
+\label{eq:flow_map_average_velocity}
+\end{align}
+Since each parameterisation can be obtained from the other, the two are equivalent. Since MeanFlow has shown to be state-of-the-art, we use flow maps trained with MeanFlow in all of our experiments: for the two-dimensional experiments, and a publicly released MeanFlow model for the image experiments.
+
+\section{Variational Inference}
+\label{sec:variational_inference}
+In Section~\ref{sec:variational_flow_maps}, we will see that VFM formulates conditional generation with a flow map as inferring a posterior distribution over the noise space of the flow map. This posterior distribution can only be evaluated up to a normalising constant. Variational inference (VI) is the standard tool for approximating such distributions \parencite{Blei_2017}. This section introduces VI, first for a single observation and then in its amortised form, which both VFM and our method use. Our presentation roughly follows \textcite{pml2Book}.
+
+\subsection{VI for a Single Observation}
+\label{subsec:vi_single_observation}
+Consider a probabilistic model with an unobserved latent variable $\mathbf{z}$, distributed according to a prior $p(\mathbf{z})$. In this model, an observation $\mathbf{y}$ is generated from a latent $\mathbf{z}\sim p(\mathbf{z})$ by sampling $\mathbf{y}\sim p(\mathbf{y}\mid\mathbf{z})$, where $p(\mathbf{y}\mid\mathbf{z})$ is called the likelihood. Suppose we are given an observation $\mathbf{y}$ and wish to determine which latent generated it. More precisely, in probabilistic modelling, we wish to determine the following posterior over latents which could have plausibly generated $\mathbf{y}$
+\begin{equation}
+p(\mathbf{z}\mid\mathbf{y})
+=
+\frac{p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})}{p(\mathbf{y})}
+\qquad
+p(\mathbf{y})
+=
+\int p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})\,\mathrm{d}\mathbf{z}
+\label{eq:vi_posterior}
+\end{equation}
+
+Computing $p(\mathbf{y})$ requires integrating over all latents, which is generally intractable. We therefore cannot evaluate $p(\mathbf{z}\mid\mathbf{y})$ exactly, nor sample from it. To overcome this, VI chooses a tractable family of distributions $q_{\psi}(\mathbf{z})$, parameterised by variational parameters $\psi$, and optimises $\psi$ so that $q_{\psi}(\mathbf{z})$ approximates $p(\mathbf{z}\mid\mathbf{y})$. Importantly, the variational family must allow both density evaluation and sampling. A common choice is the family of Gaussian distributions, in which case $\psi$ consists of a mean and a variance.
+
+VI optimises $\psi$ by minimising the reverse KL divergence between $q_{\psi}(\mathbf{z})$ and $p(\mathbf{z}\mid\mathbf{y})$ with respect to $\psi$.
+Using the definition of KL divergence (twice) and Bayes' rule,
+\begin{align}
+&D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z}\mid\mathbf{y})\right)
+\nonumber
+\\
+&\qquad=
+\mathbb{E}_{\mathbf{z}\sim q_{\psi}}
+\left[
+\log q_{\psi}(\mathbf{z})
+-\log p(\mathbf{y}\mid\mathbf{z})
+-\log p(\mathbf{z})
+\right]
++\log p(\mathbf{y})
+\nonumber
+\\
+&\qquad=
+-\mathbb{E}_{\mathbf{z}\sim q_{\psi}}
+\left[\log p(\mathbf{y}\mid\mathbf{z})\right]
++
+D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)
++\log p(\mathbf{y})
+\label{eq:vi_kl_decomposition}
+\\
+&\qquad=
+-\mathrm{ELBO}(\psi;\mathbf{y})+\log p(\mathbf{y})
+\nonumber
+\end{align}
+
+Since $\log p(\mathbf{y})$ does not depend on $\psi$, minimising the KL divergence is equivalent to maximising the ELBO, which requires only being able to evaluate the unnormalised posterior $p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})$.
+
+This is the same reverse-KL objective used to train normalising flows in Equation~\ref{eq:normalising_flow_reverse_kl}, with $q_{\psi}$ in place of $p_{\phi}$ and the posterior as the target. The VI framework makes explicit that the normalising constant of the target is not required to minimise this objective. It also offers an interpretation specific to posterior inference. By Equation~\ref{eq:vi_kl_decomposition}, maximising the ELBO balances two goals: placing mass on latents that explain the observation well, by maximising the expected log-likelihood $\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]$, and keeping $q_{\psi}$ close to the prior, by minimising $D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$.
+
+
+
 
 
 % \section{Generative Modelling}
