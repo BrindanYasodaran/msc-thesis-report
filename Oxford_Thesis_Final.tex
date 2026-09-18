@@ -425,7 +425,8 @@ For the inverse problems defined above, $p(\mathbf{y}\mid\mathbf{x})$ is the lik
 
 \section{Flow-Based Generative Modelling}
 \label{sec:flow_based_generative_modelling}
-Flow-based generative models transform samples from a tractable base distribution $p_{\mathrm{base}}(\mathbf{z})$ into samples from a target distribution $p_{\mathrm{target}}(\mathbf{x})$. Normalising flows represent this transformation as a finite composition of invertible maps \parencite{NF_survey}. Flow models and flow maps represent it as a continuous transformation governed by an ODE. While flow models learn the vector field defining the ODE \parencite{lipman_FM,mit_FM}, flow maps instead aim to directly learn the integral of the ODE \parencite{sander_MF}.
+Flow-based generative models transform samples from a tractable base distribution $p_{\mathrm{base}}(\mathbf{z})$, typically a standard normal $\mathcal{N}(\mathbf{0},\mathbf{I})$, into samples from a target distribution $p_{\mathrm{target}}(\mathbf{x})$.
+Normalising flows represent this transformation as a finite composition of invertible maps \parencite{NF_survey}. Flow models and flow maps represent it as a continuous transformation governed by an ODE. While flow models learn the vector field defining the ODE \parencite{lipman_FM,mit_FM}, flow maps instead aim to directly learn the integral of the ODE \parencite{sander_MF}.
 
 These models play different roles in this thesis. A pretrained flow map acts as the generative model that maps noise to data. Whereas we use a normalising flow to learn a conditional distribution over the noise space of the flow model (i.e. the noise adapter). Flow models provide the continuous-time transport framework from which flow maps are defined.
 
@@ -921,10 +922,157 @@ D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)
 -\mathrm{ELBO}(\psi;\mathbf{y})+\log p(\mathbf{y})
 \nonumber
 \end{align}
+Here, $\mathrm{ELBO}(\psi;\mathbf{y}):=\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]-D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$ is the evidence lower bound. Since $\log p(\mathbf{y})$ does not depend on $\psi$, minimising the KL divergence is equivalent to maximising the ELBO, which requires only being able to evaluate the unnormalised posterior $p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})$.
 
-Since $\log p(\mathbf{y})$ does not depend on $\psi$, minimising the KL divergence is equivalent to maximising the ELBO, which requires only being able to evaluate the unnormalised posterior $p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})$.
 
 This is the same reverse-KL objective used to train normalising flows in Equation~\ref{eq:normalising_flow_reverse_kl}, with $q_{\psi}$ in place of $p_{\phi}$ and the posterior as the target. The VI framework makes explicit that the normalising constant of the target is not required to minimise this objective. It also offers an interpretation specific to posterior inference. By Equation~\ref{eq:vi_kl_decomposition}, maximising the ELBO balances two goals: placing mass on latents that explain the observation well, by maximising the expected log-likelihood $\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]$, and keeping $q_{\psi}$ close to the prior, by minimising $D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$.
+
+\subsection{Amortised VI}
+\label{subsec:amortised_vi}
+In the probabilistic model defined above, each time we draw a latent $\mathbf{z}\sim p(\mathbf{z})$ and then sample an observation $\mathbf{y}\sim p(\mathbf{y}\mid\mathbf{z})$, the resulting observation varies, and each observation has its own posterior $p(\mathbf{z}\mid\mathbf{y})$.
+The procedure of Section~\ref{subsec:vi_single_observation} fits a distribution $q_{\psi}(\mathbf{z})$ to one of these posteriors for a given $\mathbf{y}$, so the optimal parameters $\psi$ depend on the observation $\mathbf{y}$. Every time a new observation arrives, a new optimisation problem must therefore be solved to find the parameters of the approximating distribution. In an inverse problem, where every new measurement corresponds to a new observation, this makes posterior inference expensive at test time.
+
+Amortised VI avoids this by learning a neural network $g_{\phi}$, with parameters $\phi$, that maps any observation $\mathbf{y}$ to the variational parameters $\psi=g_{\phi}(\mathbf{y})$ of the variational distribution $q_{\psi}(\mathbf{z})$ which approximates $p(\mathbf{z}\mid\mathbf{y})$. We write the resulting approximation as $q_{\phi}(\mathbf{z}\mid\mathbf{y}):=q_{\psi}(\mathbf{z})$, to make explicit that it depends on both the network parameters $\phi$ and the observation $\mathbf{y}$. Since the network must approximate the posterior of every observation the probabilistic model can produce, $\phi$ is trained to maximise the expected ELBO over observations,
+\begin{align}
+&\max_{\phi}\;
+\mathbb{E}_{\mathbf{y}\sim p(\mathbf{y})}
+\left[\mathrm{ELBO}\left(g_{\phi}(\mathbf{y});\mathbf{y}\right)\right]
+\nonumber
+\\
+&\qquad=
+\max_{\phi}\;
+\mathbb{E}_{\mathbf{y}\sim p(\mathbf{y})}
+\left[
+\mathbb{E}_{\mathbf{z}\sim q_{\phi}(\cdot\mid\mathbf{y})}
+\left[\log p(\mathbf{y}\mid\mathbf{z})\right]
+-
+D_{\mathrm{KL}}\left(q_{\phi}(\mathbf{z}\mid\mathbf{y})\parallel p(\mathbf{z})\right)
+\right]
+\label{eq:amortised_objective}
+\end{align}
+where the second line follows by substituting $\psi=g_{\phi}(\mathbf{y})$ into the definition of the ELBO.
+In practice, this expectation is estimated using a batch of observations (this is known as stochastic VI). In amortised VI, the cost of optimisation is thus paid once, during training, and shared across all observations. Hence approximating the posterior of a new observation requires only a single forward pass of the network rather than an entire new optimisation procedure. 
+
+\section{Variational Flow Maps}
+\label{sec:variational_flow_maps}
+This section introduces Variational Flow Maps (VFM) \parencite{VFM}, the method that this thesis builds on. Recall that our goal is to solve inverse problems with a pretrained flow map, in a single network evaluation of the flow map. VFM addresses this by framing conditional generation as a probabilistic inference problem over the input noise space of the flow map, which it performs using amortised VI. We first explain this framing, then describe VFM's Gaussian noise adapter, and finally explain why VFM must fine-tune the pretrained flow map, which is the limitation that motivates our method.
+
+\subsection{Conditional Generation in Noise Space}
+\label{subsec:vfm_noise_space}
+Recall the inverse problem setup from Section~\ref{subsec:inverse_problems}: an observation $\mathbf{y}=\mathcal{A}(\mathbf{x})+\boldsymbol{\eta}$ is produced from an unknown data sample $\mathbf{x}\sim p_{\mathrm{data}}$ by a forward operator $\mathcal{A}$ and measurement noise $\boldsymbol{\eta}$. Given $\mathbf{y}$, the goal is to generate samples from the posterior $p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})$, i.e. plausible data samples that are consistent with $\mathbf{y}$.
+
+Now suppose we have a pretrained unconditional flow map, whose one-step generator maps noise $\mathbf{z}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$ to samples $\mathbf{x}=G_{\theta}(\mathbf{z})\sim p_{\theta}(\mathbf{x})$, where $p_{\theta}(\mathbf{x})\approx p_{\mathrm{data}}(\mathbf{x})$. Both VFM and this thesis aim to use this flow map to generate samples, also in a single step, from the posterior
+\begin{equation}
+p_{\theta}(\mathbf{x}\mid\mathbf{y})
+\propto
+p(\mathbf{y}\mid\mathbf{x})\,p_{\theta}(\mathbf{x})
+\label{eq:model_posterior}
+\end{equation}
+which approximates $p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})$. VFM achieves this by fine-tuning the flow map, whereas this thesis aims to do so while keeping the pretrained flow map frozen.
+
+For flow models, this goal is typically achieved by guidance. Suppose we have a pretrained unconditional velocity network $v_{\theta}$, whose trajectories end at samples from $p_{\theta}(\mathbf{x})$. Guidance nudges the output of $v_{\theta}$ at every step of the sampling procedure, so that the trajectory instead ends at a sample from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ (Chapter~\ref{chap:related_work}).
+A one-step generator has no such trajectory to nudge: once the noise $\mathbf{z}$ is chosen, $G_{\theta}$ transports it directly to the data sample $G_{\theta}(\mathbf{z})$.
+
+The key insight of VFM \parencite{VFM} is that the starting noise is therefore the only remaining lever for controlling the generated sample. To generate samples from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$, we can instead look for a distribution over the starting noise with the following property: if $\mathbf{z}$ is drawn from it, then $G_{\theta}(\mathbf{z})$ is distributed according to $p_{\theta}(\mathbf{x}\mid\mathbf{y})$. Because $G_{\theta}$ is a bijection between noise and data (Section~\ref{subsubsec:flow_map_bijection}), such a distribution exists and is unique: it is obtained by pulling $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ back through $G_{\theta}$ into noise space. We denote this distribution as $p_{\theta}(\mathbf{z}\mid\mathbf{y})$. Drawing $\mathbf{z}$ from this noise distribution and applying $G_{\theta}$ yields samples from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$.
+
+Although we defined $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ by pulling $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ back through $G_{\theta}$, its density can be derived without the change-of-variables formula. Since the observation $\mathbf{y}$ depends on the noise $\mathbf{z}$ only through the generated sample $\mathbf{x}=G_{\theta}(\mathbf{z})$, and $G_{\theta}$ is deterministic, Bayes' rule in noise space gives
+\begin{align}
+p_{\theta}(\mathbf{z}\mid\mathbf{y})
+&\propto
+p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))\,\mathcal{N}\left(\mathbf{z}\mid\mathbf{0},\mathbf{I}\right)
+\nonumber
+\\
+&=
+\mathcal{N}\left(\mathbf{y}\mid\mathcal{A}(G_{\theta}(\mathbf{z})),\sigma_y^2\mathbf{I}_{M}\right)
+\,
+\mathcal{N}\left(\mathbf{z}\mid\mathbf{0},\mathbf{I}\right)
+\label{eq:noise_posterior}
+\end{align}
+where the second line substitutes the likelihood of Equation~\ref{eq:inverse_problem_likelihood}, evaluated at $G_{\theta}(\mathbf{z})$.
+
+Our goal is to sample from $p_{\theta}(\mathbf{z}\mid\mathbf{y})$. However, we cannot do so directly because computing its normalising constant requires integrating over the entire noise space and so is intractable. Fortunately, because we can evaluate its density up to this constant according to Equation~\ref{eq:noise_posterior}, VI can be used to approximate it. Indeed, our setup is an instance of the probabilistic model we introduced in Section~\ref{subsec:vi_single_observation}, in which the noise $\mathbf{z}$ is the latent variable, with prior $\mathcal{N}(\mathbf{0},\mathbf{I})$ and likelihood $p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$.
+
+\subsection{The Gaussian Noise Adapter}
+\label{subsec:vfm_gaussian_adapter}
+Since every observation $\mathbf{y}$ has its own noise posterior $p_{\theta}(\mathbf{z}\mid\mathbf{y})$, VFM approximates them all simultaneously with a single neural network, using amortised VI (Section~\ref{subsec:amortised_vi}). Recall that amortised VI trains a network $g_{\phi}$ which, given an observation $\mathbf{y}$, outputs the parameters of the variational distribution approximating its posterior. VFM calls this network the noise adapter, and chooses the variational family to be Gaussians with diagonal covariance. Given $\mathbf{y}$, the noise adapter therefore outputs a mean and a variance,
+\begin{equation}
+g_{\phi}(\mathbf{y})
+=
+\left(\boldsymbol{\mu}_{\phi}(\mathbf{y}),\,\boldsymbol{\sigma}^2_{\phi}(\mathbf{y})\right)
+\label{eq:noise_adapter}
+\end{equation}
+and the variational distribution approximating $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ is
+\begin{equation}
+q_{\phi}(\mathbf{z}\mid\mathbf{y})
+=
+\mathcal{N}\left(\mathbf{z}\mid\boldsymbol{\mu}_{\phi}(\mathbf{y}),\,\mathrm{diag}\left(\boldsymbol{\sigma}^2_{\phi}(\mathbf{y})\right)\right)
+\label{eq:gaussian_adapter}
+\end{equation}
+Diagonal Gaussians satisfy both requirements of VI. To draw a sample, we query the noise adapter for $\boldsymbol{\mu}_{\phi}(\mathbf{y})$ and $\boldsymbol{\sigma}_{\phi}(\mathbf{y})$, draw $\boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$, and set $\mathbf{z}=\boldsymbol{\mu}_{\phi}(\mathbf{y})+\boldsymbol{\sigma}_{\phi}(\mathbf{y})\odot\boldsymbol{\epsilon}$. The density can also be evaluated exactly.
+
+To learn $\phi$, VFM maximises the amortised objective of Equation~\ref{eq:amortised_objective}. This objective requires evaluating the prior and the log-likelihood of the probabilistic model. 
+In the VFM setting, the prior is $p(\mathbf{z})=\mathcal{N}(\mathbf{0},\mathbf{I})$. Because $G_{\theta}$ is deterministic, knowing $\mathbf{z}$ is the same as knowing the generated sample $G_{\theta}(\mathbf{z})$. Conditioning on either one therefore gives the same distribution for $\mathbf{y}$, so the likelihood term of the VI model satisfies $p(\mathbf{y}\mid\mathbf{z})=p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$. We use the latter form to make the dependence on the flow map explicit. By Equation~\ref{eq:inverse_problem_likelihood}, its logarithm is
+\begin{equation}
+\log p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))
+=
+-\frac{\lVert\mathbf{y}-\mathcal{A}(G_{\theta}(\mathbf{z}))\rVert_2^2}{2\sigma_y^2}
++\mathrm{const}
+\label{eq:vfm_log_likelihood}
+\end{equation}
+where the constant does not depend on $\phi$. Substituting our prior and likelihood into Equation~\ref{eq:amortised_objective}, negating, and dropping the constant, we see that maximising the amortised ELBO objective is equivalent to minimising the loss
+% \begin{equation}
+% \mathcal{L}_{\mathrm{ELBO}}(\phi)
+% =
+% \mathbb{E}_{\mathbf{y}}
+% \left[
+% \mathbb{E}_{\mathbf{z}\sim q_{\phi}(\cdot\mid\mathbf{y})}
+% \left[
+% \frac{\lVert\mathbf{y}-\mathcal{A}(G_{\theta}(\mathbf{z}))\rVert_2^2}{2\sigma_y^2}
+% \right]
+% +
+% D_{\mathrm{KL}}\left(q_{\phi}(\mathbf{z}\mid\mathbf{y})\parallel\mathcal{N}(\mathbf{0},\mathbf{I})\right)
+% \right]
+% \label{eq:vfm_elbo_loss}
+% \end{equation}
+\begin{align}
+&\mathcal{L}_{\mathrm{ELBO}}(\phi)
+\nonumber
+\\
+&\qquad=
+\mathbb{E}_{\mathbf{y}}
+\left[
+\mathbb{E}_{\mathbf{z}\sim q_{\phi}(\cdot\mid\mathbf{y})}
+\left[
+\frac{\lVert\mathbf{y}-\mathcal{A}(G_{\theta}(\mathbf{z}))\rVert_2^2}{2\sigma_y^2}
+\right]
++
+D_{\mathrm{KL}}\left(q_{\phi}(\mathbf{z}\mid\mathbf{y})\parallel\mathcal{N}(\mathbf{0},\mathbf{I})\right)
+\right]
+\label{eq:vfm_elbo_loss}
+\end{align}
+Following \textcite{VFM}, we refer to the first term as the observation loss and the second as the KL-to-prior loss. 
+The observation loss rewards noise that the generator maps to samples consistent with $\mathbf{y}$, while the KL-to-prior loss keeps the noise adapter's output close to the standard normal inputs on which the flow map was trained. Since both $q_{\phi}(\mathbf{z}\mid\mathbf{y})$ and the prior are Gaussian, the KL-to-prior loss has a closed form and can be evaluated exactly.
+In practice, the expectation over $\mathbf{y}$ is estimated using observations obtained by applying the forward problem to training data.
+
+\subsection{Joint Training of the Noise Adapter and Flow Map}
+\label{subsec:vfm_joint_training}
+Although a diagonal Gaussian supports both sampling and density evaluation operations required by VI, it may be too simple to approximate the noise posterior $p_{\theta}(\mathbf{z}\mid\mathbf{y})$. The data posterior $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ is often multimodal, and pulling a multimodal distribution back through a nonlinear flow map may give a noise posterior that is also multimodal, which a single Gaussian cannot represent. Moreover, the noise adapter is trained with the reverse-KL objective, which is mode-seeking (as discussed in Section~\ref{subsubsec:training_normalising_flows}), so it tends to collapse onto a single mode. \textcite{VFM} establish this failure both theoretically and empirically. 
+
+VFM's solution is to fine-tune the flow map jointly with the noise adapter, so that the geometry of the noise space is reshaped such that $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ can be better approximated by a simple Gaussian. 
+This is possible because the ELBO objective depends on $\theta$ as well as $\phi$. Since the ELBO is a lower bound on the log-evidence $\log p_{\theta}(\mathbf{y})$, maximising it with respect to $\theta$ performs approximate maximum-likelihood estimation of the flow map. However, fine-tuning on the ELBO alone could turn $G_{\theta}$ into a map that is no longer a valid flow map. VFM therefore adds a term based on the MeanFlow loss $\mathcal{L}_{\mathrm{MF}}$ of Appendix~\ref{sec:meanflow_appendix}, giving the joint objective
+\begin{equation}
+\mathcal{L}_{\mathrm{VFM}}(\phi,\theta)
+=
+\mathcal{L}_{\mathrm{ELBO}}(\phi;\theta^{-})
++
+\frac{1}{2\tau^2}\,\mathcal{L}_{\mathrm{MF}}(\theta;\phi)
+\label{eq:vfm_joint_objective}
+\end{equation}
+Here, $\tau$ weights the MeanFlow term. Two details of this objective matter in practice. First, for stability, the observation loss is evaluated using an exponential moving average $\theta^{-}$ of the flow map's parameters, rather than $\theta$ itself. The flow map's parameters are therefore updated only through the MeanFlow term. Second, the MeanFlow term is evaluated on noise drawn partly from the adapter, in a proportion $\alpha$, rather than only from the standard normal. This is what allows fine-tuning to reshape the noise space. We refer to \textcite{VFM} for a rigorous derivation of Equation~\ref{eq:vfm_joint_objective}, since we do not use this objective in our method.
+
+To summarise, Joint training allows VFM to perform conditional generation in a single step with a simple Gaussian adapter, but at the cost of fine-tuning the flow map. 
+Since the flow map is fine-tuned for a specific conditional generation setting, a new round of fine-tuning is required whenever the setting changes. For example when moving from inverse problems to conditioning on a text prompt.
+This is expensive for large generators, and fine-tuning for one setting may degrade the flow map's ability to generate from the unconditional data distribution. \textcite{VFM} themselves suggest replacing the Gaussian adapter with a more expressive variational family, such as normalising flows, as future work. This thesis pursues this direction: we keep the pretrained flow map frozen, and instead make the noise adapter expressive enough to approximate the noise posterior on its own.
 
 
 
