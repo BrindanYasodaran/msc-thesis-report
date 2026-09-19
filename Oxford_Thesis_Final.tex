@@ -71,7 +71,9 @@
 \newcommand{\bimginp}[1]{\raisebox{-.5\height}{\includegraphics[width=0.103\linewidth]{inp_baseline_panels/col_#1.png}}}
 \newcommand{\himg}[2]{\raisebox{-.5\height}{\includegraphics[width=#1\linewidth]{inp_failure/#2.png}}}
 
-
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 %%%%% FONTS AND ENCODING
 \usepackage[T1]{fontenc}
@@ -818,7 +820,7 @@ The velocity is subtracted because time runs from $t=1$ to $t=0$. Smaller steps 
 \label{subsubsec:flow_matching}
 We want to learn a vector field $v_{\theta}$ that transports $\mathbf{X}_1\sim p_{\mathrm{base}}$ to $\mathbf{X}_0\sim p_{\theta}$, such that $p_{\theta}$ approximates $p_{\mathrm{target}}$. However, this requirement only constrains the two ends of the transformation. Many different vector fields transport $p_{\mathrm{base}}$ to $p_{\mathrm{target}}$, and they differ in the intermediate distributions $p_t$ that the samples pass through on the way. Flow matching \parencite{lipman_FM} removes this ambiguity by explicitly constructing a target sequence of distributions $p_t$, called a probability path, together with a vector field that moves samples along it. That is, if we draw samples from $p_{\mathrm{base}}$ and follow this constructed vector field, the samples are distributed according to the constructed probability path $p_t$ at every time $t$. This constructed vector field is called the marginal vector field, and flow matching trains $v_{\theta}$ to match it.
 
-In the flow matching framework, constructing $p_t$ boils down to choosing a conditional probability path (together with a 'conditional vector field' that follows it).
+In the flow matching framework, constructing $p_t$ boils down to choosing a 'conditional probability path' (together with a 'conditional vector field' that follows it).
 We choose the CondOT conditional probability path in this thesis, and refer to \textcite{mit_FM} for details regarding the exact construction of $p_t$. Given this choice, $p_t$ is very simple. A sample from $p_t$ is obtained by drawing a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$ independently, and taking the point a fraction $t$ of the way along the straight line from $\mathbf{x}_0$ to $\mathbf{x}_1$:
 \begin{equation}
 \mathbf{x}_t
@@ -884,7 +886,7 @@ F(\mathbf{x}_s,s,t)
 \mathbf{x}_s+(t-s)\,V(\mathbf{x}_s,s,t)
 \label{eq:flow_map_average_velocity}
 \end{align}
-Since each parameterisation can be obtained from the other, the two are equivalent. Since MeanFlow has shown to be state-of-the-art, we use flow maps trained with MeanFlow in all of our experiments: for the two-dimensional experiments, and a publicly released MeanFlow model for the image experiments.
+Since each parameterisation can be obtained from the other according to Equation~\ref{eq:flow_map_average_velocity}, the two are equivalent. Since MeanFlow has shown to be state-of-the-art, we use flow maps trained with MeanFlow in all of our experiments: for the two-dimensional experiments, and a publicly released MeanFlow model for the image experiments.
 
 \section{Variational Inference}
 \label{sec:variational_inference}
@@ -1081,6 +1083,118 @@ Here, $\tau$ weights the MeanFlow term. Two details of this objective matter in 
 To summarise, Joint training allows VFM to perform conditional generation in a single step with a simple Gaussian adapter, but at the cost of fine-tuning the flow map. 
 Since the flow map is fine-tuned for a specific conditional generation setting, a new round of fine-tuning is required whenever the setting changes. For example when moving from inverse problems to conditioning on a text prompt.
 This is expensive for large generators, and fine-tuning for one setting may degrade the flow map's ability to generate from the unconditional data distribution. \textcite{VFM} themselves suggest replacing the Gaussian adapter with a more expressive variational family, such as normalising flows, as future work. This thesis pursues this direction: we keep the pretrained flow map frozen, and instead make the noise adapter expressive enough to approximate the noise posterior on its own.
+
+\chapter{NF-VFM: Variational Flow Maps with a Normalising Flow Adapter}
+\label{chap:method}
+VFM achieves one-step conditional generation, but only by fine-tuning the flow map. VFM needs to fine-tune the flow map because its noise adapter is a diagonal Gaussian, which is too simple to approximate the noise posterior $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ of the pretrained flow map (Section~\ref{subsec:vfm_joint_training}). This chapter introduces NF-VFM, which instead makes the noise adapter more expressive, by replacing the diagonal Gaussian with a conditional normalising flow. A normalising flow adapter can approximate the noise posterior of the pretrained flow map directly. The flow map therefore does not need to be fine-tuned, and remains frozen for every conditional generation task. The rest of this chapter explains our choice of variational family (Section~\ref{sec:nf_noise_adapter}), how the noise adapter is trained (Section~\ref{sec:training_objectives}), its architecture (Section~\ref{sec:adapter_architectures}), and how we evaluate NF-VFM (Section~\ref{sec:evaluation_framework}).
+
+
+\section{A Normalising Flow Noise Adapter}
+\label{sec:nf_noise_adapter}
+With the flow map frozen, the noise posterior $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ is determined entirely by the pretrained flow map, and may be complex. We must therefore approximate it with a variational family that is sufficiently expressive. As in any application of VI, this family must also allow both sampling and density evaluation. Importantly, density evaluation and sampling must remain tractable when the noise is high-dimensional (for example, $D=3072$ in our image experiments).
+
+\subsection{Alternative Variational Families}
+\label{subsec:alternative_variational_families}
+Two natural extensions of VFM's diagonal Gaussian fall short of these requirements. A Gaussian with a full covariance matrix is more expressive. However, the noise adapter must then output the entire covariance matrix, which, being symmetric, has $D(D+1)/2$ free entries, a number that grows quadratically with the noise dimension. For example, with $D=3072$, this is about 4.7 million values for every observation. A full-covariance Gaussian is also still unimodal, so it cannot represent posteriors with several disjoint modes. A mixture of $K$ diagonal Gaussians, by contrast, can represent several modes. However, the number of components $K$ must be chosen in advance, and so must be tuned as a hyperparameter separately for each conditional generation setting. Moreover, the number of components needed may be very large for image-scale problems. 
+
+\subsection{A Conditional Normalising Flow Adapter}
+\label{subsec:conditional_nf_adapter}
+We instead take the variational family to be the distributions produced by a conditional normalising flow. This choice can be seen as a direct generalisation of VFM's Gaussian adapter. To see this, consider how a sample is drawn from the Gaussian adapter. We first draw base noise $\boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$, and then transform it by the elementwise affine map $\mathbf{z}=\boldsymbol{\mu}_{\phi}(\mathbf{y})+\boldsymbol{\sigma}_{\phi}(\mathbf{y})\odot\boldsymbol{\epsilon}$, whose parameters depend on $\mathbf{y}$. Since an affine transformation of a Gaussian is itself Gaussian, the resulting variational distribution $q_\phi(\mathbf{z} \mid \mathbf{y})$ is always Gaussian. NF-VFM keeps this recipe, but replaces the affine map with a general normalising flow $T_{\phi}(\cdot,;\mathbf{y})$:
+\begin{equation}
+\boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I})
+\qquad
+\mathbf{z}=T_{\phi}(\boldsymbol{\epsilon};\mathbf{y})
+\label{eq:nf_adapter}
+\end{equation}
+Since an affine transformation is a diffeomorphism and hence is itself a very simple normalising flow, NF-VFM's adapter strictly generalises VFM's. 
+
+Here, $T_{\phi}$ is a conditional normalising flow: for any fixed observation $\mathbf{y}$, the map $\boldsymbol{\epsilon}\mapsto T_{\phi}(\boldsymbol{\epsilon};\mathbf{y})$ is a standard normalising flow, with $\mathbf{y}$ acting as a parameter of the flow rather than as a variable that it transforms. It is therefore invertible, and applying the change-of-variables formula of Equation~\ref{eq:normalising_flow_change_of_variables}, with base distribution $\mathcal{N}(\mathbf{0},\mathbf{I})$, gives the density of the noise adapter:
+\begin{equation}
+q_{\phi}(\mathbf{z}\mid\mathbf{y})
+=
+\mathcal{N}\left(T_{\phi}^{-1}(\mathbf{z};\mathbf{y})\mid\mathbf{0},\mathbf{I}\right)
+\left|
+\det
+\frac{\partial T_{\phi}^{-1}(\mathbf{z};\mathbf{y})}{\partial\mathbf{z}}
+\right|
+\label{eq:nf_adapter_density}
+\end{equation}
+This family therefore allows both sampling and exact density evaluation, and composing many flow layers makes it expressive enough to represent complex distributions \parencite{NF_survey}. We address the remaining requirement, tractability in high dimensions, through careful choice of the architecture of $T_{\phi}$ in Section~\ref{sec:adapter_architectures}.
+
+\section{Training Objectives}
+\label{sec:training_objectives}
+Section~\ref{subsubsec:training_normalising_flows} described two ways to train a normalising flow: by minimising the reverse or the forward KL divergence to its target distribution. In NF-VFM, the target distribution is the noise posterior $p_{\theta}(\mathbf{z}\mid\mathbf{y})$, and both objectives can be used. 
+We describe each in turn, then a combination of the two, and finally discuss a common approach to tune the weighting between the KL-to-prior and observation loss terms in the reverse KL objective. 
+
+\subsection{Reverse KL}
+\label{subsec:reverse_kl_objective}
+We train the noise adapter with the same reverse-KL objective that VFM derives, $\mathcal{L}_{\mathrm{ELBO}}$ from Equation~\ref{eq:vfm_elbo_loss}, which we denote $\mathcal{L}_{\mathrm{rKL}}$ from now on:
+\begin{align}
+\mathcal{L}_{\mathrm{rKL}}(\phi)
+&=
+\mathbb{E}_{\mathbf{y}\sim p(\mathbf{y})}
+\left[
+\mathbb{E}_{\mathbf{z}\sim q_{\phi}(\cdot\mid\mathbf{y})}
+\left[
+\frac{\lVert\mathbf{y}-\mathcal{A}(G_{\theta}(\mathbf{z}))\rVert_2^2}{2\sigma_y^2}
+\right]
++
+D_{\mathrm{KL}}\left(q_{\phi}(\mathbf{z}\mid\mathbf{y})\parallel\mathcal{N}(\mathbf{0},\mathbf{I})\right)
+\right]
+\nonumber
+\\
+&=
+\mathbb{E}_{\mathbf{y}\sim p(\mathbf{y})}\,
+\mathbb{E}_{\mathbf{z}\sim q_{\phi}(\cdot\mid\mathbf{y})}
+\left[
+\frac{\lVert\mathbf{y}-\mathcal{A}(G_{\theta}(\mathbf{z}))\rVert_2^2}{2\sigma_y^2}
++\log q_{\phi}(\mathbf{z}\mid\mathbf{y})
+-\log\mathcal{N}(\mathbf{z}\mid\mathbf{0},\mathbf{I})
+\right]
+\label{eq:rkl_objective}
+\end{align}
+
+Unlike for VFM's Gaussian adapter, the KL divergence between the normalising flow adapter and the Gaussian prior has no closed form. As a result, the KL-to-prior term must now be estimated from samples, together with the observation loss, rather than computed exactly. Algorithm~\ref{alg:rkl} summarises how we estimate Equation~\ref{eq:rkl_objective} and use it to train the noise adapter. We estimate the outer expectation with a batch of observations, and the inner expectation with a single sample for each observation.
+
+Three details of the algorithm deserve comment. First, the observations in lines~3--4 are obtained by applying the forward problem to training data. Alternatively, the forward problem can be applied to samples generated by the flow map, and we find empirically that this has little impact on training. Second, lines~5--6 use the reparameterisation trick \parencite{kingma2022autoencodingvariationalbayes}: given the base sample $\boldsymbol{\epsilon}_b$, the noise $\mathbf{z}_b$ is a differentiable function of $\phi$, so the gradient of the loss with respect to $\phi$ can be computed. 
+Third, line~7 evaluates the log-density without inverting the flow: since $\mathbf{z}$ was generated from a known base sample $\boldsymbol{\epsilon}$, the forward form of the change-of-variables formula (Equation~\ref{eq:normalising_flow_forward_change_of_variables}) applies. Finally, in line~10, gradients are backpropagated through the frozen flow map to the noise adapter, but only $\phi$ is updated.
+
+\begin{algorithm}[H]
+\caption{Training the noise adapter with the reverse-KL objective}
+\label{alg:rkl}
+\begin{algorithmic}[1]
+\Require frozen flow map $G_{\theta}$, forward operator $\mathcal{A}$, noise level $\sigma_y$, conditional normalising flow $T_{\phi}$ with trainable parameters $\phi$, batch size $B$, learning rate $\lambda$
+\Repeat
+  \For{$b=1,\ldots,B$}
+    \State $\mathbf{x}_b\sim p_{\mathrm{data}}$
+    \State $\mathbf{y}_b\gets\mathcal{A}(\mathbf{x}_b)+\boldsymbol{\eta}_b$, \quad $\boldsymbol{\eta}_b\sim\mathcal{N}(\mathbf{0},\sigma_y^2\mathbf{I})$ 
+    \State $\boldsymbol{\epsilon}_b\sim\mathcal{N}(\mathbf{0},\mathbf{I})$
+    \State $\mathbf{z}_b\gets T_{\phi}(\boldsymbol{\epsilon}_b;\mathbf{y}_b)$ 
+    \State $\log q_{\phi}(\mathbf{z}_b\mid\mathbf{y}_b)\gets\log\mathcal{N}(\boldsymbol{\epsilon}_b\mid\mathbf{0},\mathbf{I})-\log\left|\det\dfrac{\partial T_{\phi}(\boldsymbol{\epsilon}_b;\mathbf{y}_b)}{\partial\boldsymbol{\epsilon}_b}\right|$
+  \EndFor
+  \State $\hat{\mathcal{L}}_{\mathrm{rKL}}\gets\dfrac{1}{B}\displaystyle\sum_{b=1}^{B}\left[\frac{\lVert\mathbf{y}_b-\mathcal{A}(G_{\theta}(\mathbf{z}_b))\rVert_2^2}{2\sigma_y^2}+\log q_{\phi}(\mathbf{z}_b\mid\mathbf{y}_b)-\log\mathcal{N}(\mathbf{z}_b\mid\mathbf{0},\mathbf{I})\right]$
+  \State $\phi\gets\phi-\lambda\nabla_{\phi}\hat{\mathcal{L}}_{\mathrm{rKL}}$ 
+\Until{converged}
+\end{algorithmic}
+\end{algorithm}
+
+
+
+
+
+
+% Unlike for VFM's Gaussian adapter, the KL divergence between the normalising flow adapter and the Gaussian prior has no closed form. 
+% As a result, the KL-to-prior term must now be estimated together with the observation loss, rather than computed exactly.
+% We compute an estimate of ~\ref{eq:rkl_objective} in three steps.
+
+% First, we estimate the outer expectation by drawing a batch of observations $\mathbf{y}\sim p(\mathbf{y})$. In practice, a batch of observations is obtained by drawing data samples from the training set and applying the forward problem to them. 
+% Alternatively, the forward problem can be applied to samples generated by the flow map. Empirically, we find that using real or generated samples has little impact on training.  
+
+% Second, for each observation, we estimate the inner expectation with a single Monte Carlo sample. To keep this estimate differentiable with respect to $\phi$, we use the reparameterisation trick \parencite{kingma2022autoencodingvariationalbayes}: intuitively, since $\mathbf{z} \sim q_{\phi}(\mathbf{z}\mid \mathbf{y})$ is sampled by drawing base noise $\boldsymbol{\epsilon}$ and computing $\mathbf{z}=T_{\phi}(\boldsymbol{\epsilon};\mathbf{y})$ deterministically, we can rewrite the inner expectation over the fixed base distribution $\mathcal{N}(\mathbf{0},\mathbf{I})$. 
+
+% Third, we evaluate the terms inside the expectation at this Monte Carlo sample. The observation loss requires one evaluation of the flow map, $G_{\theta}(\mathbf{z})$. The log-density $\log q_{\phi}(\mathbf{z}\mid\mathbf{y})$ can be evaluated without inverting the flow: since $\mathbf{z}$ was generated from the known base sample $\boldsymbol{\epsilon}$, the forward form of the change-of-variables formula (Equation~\ref{eq:normalising_flow_forward_change_of_variables}) can be applied.
+
+% Finally, we update $\phi$ by gradient descent on this estimate. The gradients are backpropagated through the frozen flow map to the noise adapter, but only $\phi$ is updated, while the flow map parameters $\theta$ remain fixed.
 
 
 
