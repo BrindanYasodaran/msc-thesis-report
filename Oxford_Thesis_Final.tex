@@ -818,7 +818,8 @@ The velocity is subtracted because time runs from $t=1$ to $t=0$. Smaller steps 
 \label{subsubsec:flow_matching}
 We want to learn a vector field $v_{\theta}$ that transports $\mathbf{X}_1\sim p_{\mathrm{base}}$ to $\mathbf{X}_0\sim p_{\theta}$, such that $p_{\theta}$ approximates $p_{\mathrm{target}}$. However, this requirement only constrains the two ends of the transformation. Many different vector fields transport $p_{\mathrm{base}}$ to $p_{\mathrm{target}}$, and they differ in the intermediate distributions $p_t$ that the samples pass through on the way. Flow matching \parencite{lipman_FM} removes this ambiguity by explicitly constructing a target sequence of distributions $p_t$, called a probability path, together with a vector field that moves samples along it. That is, if we draw samples from $p_{\mathrm{base}}$ and follow this constructed vector field, the samples are distributed according to the constructed probability path $p_t$ at every time $t$. This constructed vector field is called the marginal vector field, and flow matching trains $v_{\theta}$ to match it.
 
-In the flow matching framework, constructing $p_t$ boils down to choosing a 'conditional probability path'. We choose the CondOT conditional probability path in this thesis, and refer to \textcite{mit_FM} for details regarding the exact construction of $p_t$. Given this choice, $p_t$ is very simple. A sample from $p_t$ is obtained by drawing a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$ independently, and taking the point a fraction $t$ of the way along the straight line from $\mathbf{x}_0$ to $\mathbf{x}_1$:
+In the flow matching framework, constructing $p_t$ boils down to choosing a conditional probability path (together with a 'conditional vector field' that follows it).
+We choose the CondOT conditional probability path in this thesis, and refer to \textcite{mit_FM} for details regarding the exact construction of $p_t$. Given this choice, $p_t$ is very simple. A sample from $p_t$ is obtained by drawing a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$ independently, and taking the point a fraction $t$ of the way along the straight line from $\mathbf{x}_0$ to $\mathbf{x}_1$:
 \begin{equation}
 \mathbf{x}_t
 =
@@ -827,7 +828,7 @@ In the flow matching framework, constructing $p_t$ boils down to choosing a 'con
 \end{equation}
 At $t=0$ this point is the data sample and at $t=1$ it is the noise sample, so $p_0=p_{\mathrm{target}}$ and $p_1=p_{\mathrm{base}}$, as required. Importantly, this straight line is only a way of drawing samples from $p_t$. It does not describe the trajectories of the marginal vector field, which are generally curved rather than straight.
 
-Having fixed $p_t$, flow matching trains $v_{\theta}$ using a simple regression objective. We sample a time $t\sim\mathcal{U}[0,1]$, a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$, construct $\mathbf{x}_t$ using Equation~\ref{eq:condot_interpolation}, and regress the output of the network at $\mathbf{x}_t$ against the velocity of the straight line, $\mathbf{x}_1-\mathbf{x}_0$:
+Having fixed $p_t$, flow matching trains $v_{\theta}$ using a very simple regression objective. We sample a time $t\sim\mathcal{U}[0,1]$, a data point $\mathbf{x}_0\sim p_{\mathrm{target}}$ and a noise sample $\mathbf{x}_1\sim p_{\mathrm{base}}$, construct $\mathbf{x}_t$ using Equation~\ref{eq:condot_interpolation}, and regress the output of the network at $\mathbf{x}_t$ against the velocity of the straight line, $\mathbf{x}_1-\mathbf{x}_0$:
 \begin{equation}
 \mathcal{L}_{\mathrm{FM}}(\theta)
 =
@@ -840,6 +841,7 @@ v_{\theta}(\mathbf{x}_t,t)
 \label{eq:flow_matching_loss}
 \end{equation}
 In practice, this expectation is estimated by averaging over a minibatch of sampled triples $(t,\mathbf{x}_0,\mathbf{x}_1)$. Although the training algorithm is simple, showing that its minimiser is the marginal vector field is fairly involved. We refer readers to \textcite{mit_FM} and \textcite{lipman_FM} for the proof. 
+Notably, flow matching is simulation-free: unlike earlier continuous-time flows trained by maximum likelihood, it never requires simulating trajectories of the ODE during training, which makes training cheap \parencite{lipman_FM}.
 
 \subsection{Flow Maps}
 \label{subsec:flow_maps}
@@ -890,7 +892,7 @@ In Section~\ref{sec:variational_flow_maps}, we will see that VFM formulates cond
 
 \subsection{VI for a Single Observation}
 \label{subsec:vi_single_observation}
-Consider a probabilistic model with an unobserved latent variable $\mathbf{z}$, distributed according to a prior $p(\mathbf{z})$. In this model, an observation $\mathbf{y}$ is generated from a latent $\mathbf{z}\sim p(\mathbf{z})$ by sampling $\mathbf{y}\sim p(\mathbf{y}\mid\mathbf{z})$, where $p(\mathbf{y}\mid\mathbf{z})$ is called the likelihood. Suppose we are given an observation $\mathbf{y}$ and wish to determine which latent generated it. More precisely, in probabilistic modelling, we wish to determine the following posterior over latents which could have plausibly generated $\mathbf{y}$
+Consider a probabilistic model with an unobserved latent variable $\mathbf{z}$, distributed according to a prior $p(\mathbf{z})$. In this model, an observation $\mathbf{y}$ is generated from a latent $\mathbf{z}\sim p(\mathbf{z})$ according to $\mathbf{y}\sim p(\mathbf{y}\mid\mathbf{z})$, where $p(\mathbf{y}\mid\mathbf{z})$ is called the likelihood. Suppose we are given an observation $\mathbf{y}$ and wish to determine which latent generated it. More precisely, in probabilistic modelling, we wish to determine the following posterior over latents which could have plausibly generated $\mathbf{y}$
 \begin{equation}
 p(\mathbf{z}\mid\mathbf{y})
 =
@@ -905,9 +907,17 @@ p(\mathbf{y})
 Computing $p(\mathbf{y})$ requires integrating over all latents, which is generally intractable. We therefore cannot evaluate $p(\mathbf{z}\mid\mathbf{y})$ exactly, nor sample from it. To overcome this, VI chooses a tractable family of distributions $q_{\psi}(\mathbf{z})$, parameterised by variational parameters $\psi$, and optimises $\psi$ so that $q_{\psi}(\mathbf{z})$ approximates $p(\mathbf{z}\mid\mathbf{y})$. Importantly, the variational family must allow both density evaluation and sampling. A common choice is the family of Gaussian distributions, in which case $\psi$ consists of a mean and a variance.
 
 VI optimises $\psi$ by minimising the reverse KL divergence between $q_{\psi}(\mathbf{z})$ and $p(\mathbf{z}\mid\mathbf{y})$ with respect to $\psi$.
-Using the definition of KL divergence (twice) and Bayes' rule,
+Using the definition of KL divergence (twice), Bayes' rule and the fact that $\log p(\mathbf{y})$ is a constant with respect to $\psi$,
 \begin{align}
 D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z}\mid\mathbf{y})\right)
+&=
+\mathbb{E}_{\mathbf{z}\sim q_{\psi}}
+\left[
+\log q_{\psi}(\mathbf{z})
+-\log p(\mathbf{z}\mid\mathbf{y})
+\right]
+\nonumber
+\\
 &=
 \mathbb{E}_{\mathbf{z}\sim q_{\psi}}
 \left[
@@ -930,18 +940,16 @@ D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)
 -\mathrm{ELBO}(\psi;\mathbf{y})+\log p(\mathbf{y})
 \nonumber
 \end{align}
+Here, $\mathrm{ELBO}(\psi;\mathbf{y}):=\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]-D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$ is the evidence lower bound, named as such because, since the KL divergence is non-negative, Equation~\ref{eq:vi_kl_decomposition} shows it is a lower bound on the log-evidence $\log p(\mathbf{y})$. Since $\log p(\mathbf{y})$ does not depend on $\psi$, minimising the KL divergence is equivalent to maximising the ELBO, which requires only the unnormalised posterior $p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})$. We now also see why the variational family must allow both sampling and density evaluation. To evaluate Equation~\ref{eq:vi_kl_decomposition}, we approximate the expectation using Monte Carlo samples from $q_{\psi}(\mathbf{z})$, and we also must compute $\log q_{\psi}(\mathbf{z})$. 
 
-Here, $\mathrm{ELBO}(\psi;\mathbf{y}):=\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]-D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$ is the evidence lower bound. Since $\log p(\mathbf{y})$ does not depend on $\psi$, minimising the KL divergence is equivalent to maximising the ELBO, which requires only being able to evaluate the unnormalised posterior $p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})$.
-
-
-This is the same reverse-KL objective used to train normalising flows in Equation~\ref{eq:normalising_flow_reverse_kl}, with $q_{\psi}$ in place of $p_{\phi}$ and the posterior as the target. The VI framework makes explicit that the normalising constant of the target is not required to minimise this objective. It also offers an interpretation specific to posterior inference. By Equation~\ref{eq:vi_kl_decomposition}, maximising the ELBO balances two goals: placing mass on latents that explain the observation well, by maximising the expected log-likelihood $\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]$, and keeping $q_{\psi}$ close to the prior, by minimising $D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$.
+This is the same reverse-KL objective used to train normalising flows in Equation~\ref{eq:normalising_flow_reverse_kl}, with $q_{\psi}$ in place of $p_{\phi}$ and the posterior as the target distribution. The VI framework makes explicit that the normalising constant of the target distribution is not required to minimise this objective. It also offers an interpretation specific to posterior inference. By Equation~\ref{eq:vi_kl_decomposition}, maximising the ELBO balances two goals: placing mass of $q_{\psi}$ on latents that explain the observation well, by maximising the expected log-likelihood $\mathbb{E}_{\mathbf{z}\sim q_{\psi}}\left[\log p(\mathbf{y}\mid\mathbf{z})\right]$, and keeping $q_{\psi}$ close to the prior, by minimising $D_{\mathrm{KL}}\left(q_{\psi}(\mathbf{z})\parallel p(\mathbf{z})\right)$.
 
 \subsection{Amortised VI}
 \label{subsec:amortised_vi}
 In the probabilistic model defined above, each time we draw a latent $\mathbf{z}\sim p(\mathbf{z})$ and then sample an observation $\mathbf{y}\sim p(\mathbf{y}\mid\mathbf{z})$, the resulting observation varies, and each observation has its own posterior $p(\mathbf{z}\mid\mathbf{y})$.
 The procedure of Section~\ref{subsec:vi_single_observation} fits a distribution $q_{\psi}(\mathbf{z})$ to one of these posteriors for a given $\mathbf{y}$, so the optimal parameters $\psi$ depend on the observation $\mathbf{y}$. Every time a new observation arrives, a new optimisation problem must therefore be solved to find the parameters of the approximating distribution. In an inverse problem, where every new measurement corresponds to a new observation, this makes posterior inference expensive at test time.
 
-Amortised VI avoids this by learning a neural network $g_{\phi}$, with parameters $\phi$, that maps any observation $\mathbf{y}$ to the variational parameters $\psi=g_{\phi}(\mathbf{y})$ of the variational distribution $q_{\psi}(\mathbf{z})$ which approximates $p(\mathbf{z}\mid\mathbf{y})$. We write the resulting approximation as $q_{\phi}(\mathbf{z}\mid\mathbf{y}):=q_{\psi}(\mathbf{z})$, to make explicit that it depends on both the network parameters $\phi$ and the observation $\mathbf{y}$. Since the network must approximate the posterior of every observation the probabilistic model can produce, $\phi$ is trained to maximise the expected ELBO over observations,
+Amortised VI avoids this by learning a neural network $g_{\phi}$, with parameters $\phi$, that maps any observation $\mathbf{y}$ to the variational parameters $\psi=g_{\phi}(\mathbf{y})$ of the variational distribution $q_{\psi}(\mathbf{z})$ which approximates $p(\mathbf{z}\mid\mathbf{y})$. We write the resulting approximation as $q_{\phi}(\mathbf{z}\mid\mathbf{y}):=q_{\psi}(\mathbf{z})$, to make explicit that it depends on both the network parameters $\phi$ and the observation $\mathbf{y}$. Since the network must approximate the posterior of any observation the probabilistic model can produce, $\phi$ is trained to maximise the expected ELBO over observations,
 \begin{align}
 &\max_{\phi}\;
 \mathbb{E}_{\mathbf{y}\sim p(\mathbf{y})}
@@ -960,7 +968,7 @@ D_{\mathrm{KL}}\left(q_{\phi}(\mathbf{z}\mid\mathbf{y})\parallel p(\mathbf{z})\r
 \label{eq:amortised_objective}
 \end{align}
 where the second line follows by substituting $\psi=g_{\phi}(\mathbf{y})$ into the definition of the ELBO.
-In practice, this expectation is estimated using a batch of observations (this is known as stochastic VI). In amortised VI, the cost of optimisation is thus paid once, during training, and shared across all observations. Hence approximating the posterior of a new observation requires only a single forward pass of the network rather than an entire new optimisation procedure. 
+In practice, the outer expectation is estimated using a batch of observations (this is known as stochastic VI). In amortised VI, the cost of optimisation is thus paid once, during training, and shared across all observations. Hence approximating the posterior of a new observation requires only a single forward pass of the network rather than an entire new optimisation procedure. 
 
 \section{Variational Flow Maps}
 \label{sec:variational_flow_maps}
@@ -970,7 +978,7 @@ This section introduces Variational Flow Maps (VFM) \parencite{VFM}, the method 
 \label{subsec:vfm_noise_space}
 Recall the inverse problem setup from Section~\ref{subsec:inverse_problems}: an observation $\mathbf{y}=\mathcal{A}(\mathbf{x})+\boldsymbol{\eta}$ is produced from an unknown data sample $\mathbf{x}\sim p_{\mathrm{data}}$ by a forward operator $\mathcal{A}$ and measurement noise $\boldsymbol{\eta}$. Given $\mathbf{y}$, the goal is to generate samples from the posterior $p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})$, i.e. plausible data samples that are consistent with $\mathbf{y}$.
 
-Now suppose we have a pretrained unconditional flow map, whose one-step generator maps noise $\mathbf{z}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$ to samples $\mathbf{x}=G_{\theta}(\mathbf{z})\sim p_{\theta}(\mathbf{x})$, where $p_{\theta}(\mathbf{x})\approx p_{\mathrm{data}}(\mathbf{x})$. Both VFM and this thesis aim to use this flow map to generate samples, also in a single step, from the posterior
+Now suppose we have a pretrained unconditional flow map, whose one-step generator maps noise $\mathbf{z}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$ to samples $\mathbf{x}=G_{\theta}(\mathbf{z})\sim p_{\theta}(\mathbf{x})$, where $p_{\theta}(\mathbf{x})\approx p_{\mathrm{data}}(\mathbf{x})$. Both VFM and this thesis aim to use this pretrained flow map to generate samples, also in a single step, from the posterior
 \begin{equation}
 p_{\theta}(\mathbf{x}\mid\mathbf{y})
 \propto
@@ -979,16 +987,20 @@ p(\mathbf{y}\mid\mathbf{x})\,p_{\theta}(\mathbf{x})
 \end{equation}
 which approximates $p_{\mathrm{data}}(\mathbf{x}\mid\mathbf{y})$. VFM achieves this by fine-tuning the flow map, whereas this thesis aims to do so while keeping the pretrained flow map frozen.
 
-For flow models, this goal is typically achieved by guidance. Suppose we have a pretrained unconditional velocity network $v_{\theta}$, whose trajectories end at samples from $p_{\theta}(\mathbf{x})$. Guidance nudges the output of $v_{\theta}$ at every step of the sampling procedure, so that the trajectory instead ends at a sample from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ (Chapter~\ref{chap:related_work}).
+For flow models, this goal is typically achieved by guidance. Suppose we have a pretrained unconditional velocity network $v_{\theta}$, whose trajectories end at samples from $p_{\theta}(\mathbf{x})$. Guidance nudges the output of $v_{\theta}$ at every step of the sampling procedure, so that the trajectory instead ends at a sample from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$.
 A one-step generator has no such trajectory to nudge: once the noise $\mathbf{z}$ is chosen, $G_{\theta}$ transports it directly to the data sample $G_{\theta}(\mathbf{z})$.
 
 The key insight of VFM \parencite{VFM} is that the starting noise is therefore the only remaining lever for controlling the generated sample. To generate samples from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$, we can instead look for a distribution over the starting noise with the following property: if $\mathbf{z}$ is drawn from it, then $G_{\theta}(\mathbf{z})$ is distributed according to $p_{\theta}(\mathbf{x}\mid\mathbf{y})$. Because $G_{\theta}$ is a bijection between noise and data (Section~\ref{subsubsec:flow_map_bijection}), such a distribution exists and is unique: it is obtained by pulling $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ back through $G_{\theta}$ into noise space. We denote this distribution as $p_{\theta}(\mathbf{z}\mid\mathbf{y})$. Drawing $\mathbf{z}$ from this noise distribution and applying $G_{\theta}$ yields samples from $p_{\theta}(\mathbf{x}\mid\mathbf{y})$.
 
-Although we defined $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ by pulling $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ back through $G_{\theta}$, its density can be derived without the change-of-variables formula. Since the observation $\mathbf{y}$ depends on the noise $\mathbf{z}$ only through the generated sample $\mathbf{x}=G_{\theta}(\mathbf{z})$, and $G_{\theta}$ is deterministic, Bayes' rule in noise space gives
+Although we defined $p_{\theta}(\mathbf{z}\mid\mathbf{y})$ by pulling $p_{\theta}(\mathbf{x}\mid\mathbf{y})$ back through $G_{\theta}$, its density can be derived directly with Bayes' rule in noise space, without the change-of-variables formula. Because $G_{\theta}$ is deterministic, knowing $\mathbf{z}$ is the same as knowing the generated sample $G_{\theta}(\mathbf{z})$. Conditioning on either one therefore gives the same distribution for $\mathbf{y}$, so $p(\mathbf{y}\mid\mathbf{z})=p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$. Hence
 \begin{align}
 p_{\theta}(\mathbf{z}\mid\mathbf{y})
 &\propto
-p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))\,\mathcal{N}\left(\mathbf{z}\mid\mathbf{0},\mathbf{I}\right)
+p(\mathbf{y}\mid\mathbf{z})\,p(\mathbf{z})
+\nonumber
+\\
+&=
+p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))\,p(\mathbf{z})
 \nonumber
 \\
 &=
@@ -997,9 +1009,11 @@ p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))\,\mathcal{N}\left(\mathbf{z}\mid\mathbf
 \mathcal{N}\left(\mathbf{z}\mid\mathbf{0},\mathbf{I}\right)
 \label{eq:noise_posterior}
 \end{align}
-where the second line substitutes the likelihood of Equation~\ref{eq:inverse_problem_likelihood}, evaluated at $G_{\theta}(\mathbf{z})$.
+The last line substitutes $p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$ with the inverse problem likelihood of Equation~\ref{eq:inverse_problem_likelihood} evaluated at $\mathbf{x}=G_{\theta}(\mathbf{z})$.
 
-Our goal is to sample from $p_{\theta}(\mathbf{z}\mid\mathbf{y})$. However, we cannot do so directly because computing its normalising constant requires integrating over the entire noise space and so is intractable. Fortunately, because we can evaluate its density up to this constant according to Equation~\ref{eq:noise_posterior}, VI can be used to approximate it. Indeed, our setup is an instance of the probabilistic model we introduced in Section~\ref{subsec:vi_single_observation}, in which the noise $\mathbf{z}$ is the latent variable, with prior $\mathcal{N}(\mathbf{0},\mathbf{I})$ and likelihood $p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$.
+Our goal is to sample from $p_{\theta}(\mathbf{z}\mid\mathbf{y})$. However, we cannot do so directly because computing its normalising constant requires integrating over the entire noise space and so is intractable. Fortunately, because we can evaluate its density up to this constant according to Equation~\ref{eq:noise_posterior}, VI can be used to approximate it. 
+
+Indeed, our setup is an instance of the probabilistic model we introduced in Section~\ref{subsec:vi_single_observation}. The unknown latent variable is the starting noise $\mathbf{z}$ of the flow map, with prior $\mathcal{N}(\mathbf{0},\mathbf{I})$. The observation $\mathbf{y}$ is produced from it by mapping $\mathbf{z}$ to a data sample with the flow map and then applying the forward problem, which gives the likelihood $p(\mathbf{y}\mid\mathbf{z})=p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$.
 
 \subsection{The Gaussian Noise Adapter}
 \label{subsec:vfm_gaussian_adapter}
@@ -1020,7 +1034,8 @@ q_{\phi}(\mathbf{z}\mid\mathbf{y})
 Diagonal Gaussians satisfy both requirements of VI. To draw a sample, we query the noise adapter for $\boldsymbol{\mu}_{\phi}(\mathbf{y})$ and $\boldsymbol{\sigma}_{\phi}(\mathbf{y})$, draw $\boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$, and set $\mathbf{z}=\boldsymbol{\mu}_{\phi}(\mathbf{y})+\boldsymbol{\sigma}_{\phi}(\mathbf{y})\odot\boldsymbol{\epsilon}$. The density can also be evaluated exactly.
 
 To learn $\phi$, VFM maximises the amortised objective of Equation~\ref{eq:amortised_objective}. This objective requires evaluating the prior and the log-likelihood of the probabilistic model. 
-In the VFM setting, the prior is $p(\mathbf{z})=\mathcal{N}(\mathbf{0},\mathbf{I})$. Because $G_{\theta}$ is deterministic, knowing $\mathbf{z}$ is the same as knowing the generated sample $G_{\theta}(\mathbf{z})$. Conditioning on either one therefore gives the same distribution for $\mathbf{y}$, so the likelihood term of the VI model satisfies $p(\mathbf{y}\mid\mathbf{z})=p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$. We use the latter form to make the dependence on the flow map explicit. By Equation~\ref{eq:inverse_problem_likelihood}, its logarithm is
+
+In the VFM setting, the prior is $p(\mathbf{z})=\mathcal{N}(\mathbf{0},\mathbf{I})$ and, as shown in Section~\ref{subsec:vfm_noise_space}, the likelihood is $p(\mathbf{y}\mid\mathbf{z})=p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))$. By Equation~\ref{eq:inverse_problem_likelihood}, its logarithm is
 \begin{equation}
 \log p(\mathbf{y}\mid G_{\theta}(\mathbf{z}))
 =
@@ -1061,7 +1076,7 @@ This is possible because the ELBO objective depends on $\theta$ as well as $\phi
 \frac{1}{2\tau^2}\,\mathcal{L}_{\mathrm{MF}}(\theta;\phi)
 \label{eq:vfm_joint_objective}
 \end{equation}
-Here, $\tau$ weights the MeanFlow term. Two details of this objective matter in practice. First, for stability, the observation loss is evaluated using an exponential moving average $\theta^{-}$ of the flow map's parameters, rather than $\theta$ itself. The flow map's parameters are therefore updated only through the MeanFlow term. Second, the MeanFlow term is evaluated on noise drawn partly from the adapter, in a proportion $\alpha$, rather than only from the standard normal. This is what allows fine-tuning to reshape the noise space. We refer to \textcite{VFM} for a rigorous derivation of Equation~\ref{eq:vfm_joint_objective}, since we do not use this objective in our method.
+Here, $\tau$ weights the MeanFlow term. Two details of this objective matter in practice. First, for training stability, the observation loss in the ELBO is evaluated using an exponential moving average $\theta^{-}$ of the flow map's parameters, rather than $\theta$ itself. The flow map's parameters are therefore updated only through the MeanFlow term. Second, the MeanFlow term is evaluated on noise drawn partly from the adapter, in a proportion $\alpha$, rather than only from the standard normal. \textcite{VFM} argue that this coupling between the adapter's noise and the flow map is what enables joint training to reshape the noise space. We refer to \textcite{VFM} for a rigorous derivation of Equation~\ref{eq:vfm_joint_objective}, since we do not use this objective in our method and instead make use of Equation~\ref{eq:vfm_elbo_loss}.
 
 To summarise, Joint training allows VFM to perform conditional generation in a single step with a simple Gaussian adapter, but at the cost of fine-tuning the flow map. 
 Since the flow map is fine-tuned for a specific conditional generation setting, a new round of fine-tuning is required whenever the setting changes. For example when moving from inverse problems to conditioning on a text prompt.
